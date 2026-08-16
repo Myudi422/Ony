@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Ony Design System + Shadcn UI Tokens (Light Mode Default) ─── */
+:root {
+  /* Ony Brand Tokens */
+  --ony-blue: #087CFF;
+  --ony-cyan: #00D9FF;
+  --gradient: linear-gradient(135deg, #00D9FF, #087CFF);
+
+  /* Light Theme Default */
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --border-color: #E2E8F0;
+  --text: #0F172A;
+  --text-muted: #64748B;
+
+  /* Shadcn UI Variables (Tailwind HSL mapped for Ony light mode) */
+  --background: 210 40% 98%;      /* #F8FAFC */
+  --foreground: 222.2 84% 4.9%;    /* #020817 */
+  
+  --card: 0 0% 100%;               /* #FFFFFF */
+  --card-foreground: 222.2 84% 4.9%;
+  
+  --popover: 0 0% 100%;            /* #FFFFFF */
+  --popover-foreground: 222.2 84% 4.9%;
+  
+  --primary: 213 100% 51.6%;       /* Ony Blue #087CFF */
+  --primary-foreground: 210 40% 98%;
+  
+  --secondary: 210 40% 96.1%;      /* #F1F5F9 */
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  
+  --muted: 210 40% 96.1%;          /* #F1F5F9 */
+  --muted-foreground: 215.4 16.3% 46.9%;
+  
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  
+  --border: 214.3 31.8% 91.4%;     /* #E2E8F0 */
+  --input: 214.3 31.8% 91.4%;
+  --ring: 213 100% 51.6%;          /* Ony Blue ring */
+  
+  --radius: 0.75rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Custom Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface-2); }
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ony-blue); }
+
+/* ─── Utility Classes ───────────────────────────────────── */
+@layer utilities {
+  .ony-gradient {
+    background: linear-gradient(135deg, #00D9FF, #087CFF);
+  }
+  .ony-gradient-text {
+    background: linear-gradient(135deg, #0284C7, #087CFF);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 24px rgba(0, 217, 255, 0.2);
+  }
+  .glow-blue {
+    box-shadow: 0 0 24px rgba(8, 124, 255, 0.2);
+  }
+}
+
+/* ─── Component Shortcuts ───────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 rounded-full font-semibold text-white text-sm
+           bg-gradient-to-r from-ony-blue to-blue-600
+           hover:opacity-95 hover:shadow-md active:scale-95 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-ony-blue/50;
+  }
+  .btn-ghost {
+    @apply px-6 py-3 rounded-full font-semibold text-sm
+           border border-slate-200 text-slate-700 bg-white
+           hover:border-ony-blue/50 hover:text-ony-blue hover:bg-slate-50
+           transition-all duration-200 shadow-sm;
+  }
+  .card-surface {
+    @apply bg-white border border-slate-200/90 rounded-xl shadow-sm;
+  }
+  .input-field {
+    @apply w-full px-4 py-3 rounded-lg bg-white border border-slate-200
+           text-slate-900 placeholder-slate-400 text-sm
+           focus:outline-none focus:border-ony-blue focus:ring-2 focus:ring-ony-blue/20
+           transition-all duration-200;
+  }
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600
+           hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200
+           text-sm font-medium;
+  }
+  .sidebar-link-active {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg
+           text-ony-blue bg-blue-50/90
+           border border-blue-200/80 text-sm font-semibold shadow-sm;
+  }
+}
+
+/* ─── Animations ────────────────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes nfc-wave {
+  0%   { opacity: 0; transform: scale(0.8); }
+  50%  { opacity: 0.6; }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float   { animation: float 6s ease-in-out infinite; }
+.animate-fade-up { animation: fade-up 0.6s ease forwards; }
+.nfc-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(8, 124, 255, 0.4);
+  animation: nfc-wave 2.5s ease-out infinite;
+}
+.nfc-ring:nth-child(2) { animation-delay: 0.8s; }
+.nfc-ring:nth-child(3) { animation-delay: 1.6s; }
+
+@layer base {
+  * {
+    @apply border-slate-200;
+  }
+}
