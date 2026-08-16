@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight } from 'lucide-react'
+import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 import { formatNumber } from '@/lib/utils'
 
@@ -50,47 +50,47 @@ export default function DashboardPage() {
   const safeCards = Array.isArray(cards) ? cards : []
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl w-full mx-auto space-y-6 sm:space-y-8 min-w-0">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 tracking-tight font-display">
           Halo, {user?.name?.split(' ')[0] ?? 'Kamu'} 👋
         </h1>
-        <p className="text-slate-600 text-sm">Kelola kartu NFC & QR digitalmu secara terpusat dari sini.</p>
+        <p className="text-slate-600 text-xs sm:text-sm">Kelola kartu NFC & QR digitalmu secara terpusat dari sini.</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="card-surface p-4 sm:p-5">
-            <div className={`w-10 h-10 ${bg} rounded-2xl flex items-center justify-center mb-3 shadow-xs`}>
+          <div key={label} className="card-surface p-3.5 sm:p-5 min-w-0">
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 ${bg} rounded-2xl flex items-center justify-center mb-2.5 shadow-xs`}>
               <Icon size={18} className={color} />
             </div>
-            <div className="text-2xl font-extrabold text-slate-900 mb-0.5 font-display">{formatNumber(value)}</div>
-            <div className="text-slate-500 text-xs font-semibold">{label}</div>
+            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 mb-0.5 font-display">{formatNumber(value)}</div>
+            <div className="text-slate-500 text-[11px] sm:text-xs font-semibold truncate">{label}</div>
           </div>
         ))}
       </div>
 
       {/* Media Cards */}
-      <div>
+      <div className="min-w-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900 font-display">Media Aktif</h2>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 font-display">Media Aktif</h2>
           <Link href="/dashboard/cards" className="text-ony-blue text-xs sm:text-sm font-semibold hover:underline flex items-center gap-1">
             Kelola semua <ArrowRight size={14} />
           </Link>
         </div>
 
         {safeCards.length === 0 ? (
-          <div className="card-surface p-8 text-center bg-white border border-slate-200">
+          <div className="card-surface p-6 sm:p-8 text-center bg-white border border-slate-200">
             <CreditCard size={40} className="text-slate-300 mx-auto mb-3" />
             <p className="text-slate-700 font-bold text-sm mb-1 font-display">Belum ada kartu terhubung</p>
             <p className="text-slate-500 text-xs">Tap kartu NFC atau scan QR untuk mengklaim media pertamamu.</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 min-w-0">
             {safeCards.slice(0, 3).map((card) => (
-              <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-5 hover:border-blue-300 transition-all group shadow-xs bg-white">
+              <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-4 sm:p-5 hover:border-blue-300 transition-all group shadow-xs bg-white min-w-0">
                 <div className="flex items-start justify-between mb-3">
                   <span className="text-2xl">{MEDIA_ICONS[card.media_type] ?? '📱'}</span>
                   <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                     {card.status}
                   </span>
                 </div>
-                <div className="text-slate-900 font-bold text-sm mb-1 group-hover:text-ony-blue transition-colors font-display">{card.card_name}</div>
+                <div className="text-slate-900 font-bold text-sm mb-1 group-hover:text-ony-blue transition-colors font-display truncate">{card.card_name}</div>
                 <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold">
                   <Wifi size={12} className="text-ony-blue" />
                   {formatNumber(card.total_taps)} interaksi
@@ -111,19 +111,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4 font-display">Aksi Cepat</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="min-w-0">
+        <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-4 font-display">Aksi Cepat</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 min-w-0">
           {[
             { href: '/dashboard/cards',     icon: CreditCard, label: 'Edit Profil',    bg: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80' },
             { href: '/dashboard/analytics', icon: BarChart2,  label: 'Lihat Analytics', bg: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80' },
-            { href: '/dashboard/qr-studio', icon: QrCode,     label: 'QR Studio',       bg: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80' },
-            { href: '/dashboard/store',     icon: Wifi,       label: 'Beli Media',      bg: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80' },
+            { href: '/dashboard/store',     icon: ShoppingBag, label: 'Toko Shopee',   bg: 'bg-orange-50/70 hover:bg-orange-100/80 border-orange-200/80' },
+            { href: '/dashboard/store',     icon: Wifi,       label: 'TikTok Shop',     bg: 'bg-slate-100/70 hover:bg-slate-200/80 border-slate-300/80' },
           ].map(({ href, icon: Icon, label, bg }) => (
             <Link key={href} href={href}
-              className={`p-4 flex flex-col items-center gap-2.5 text-center rounded-2xl border transition-all hover:-translate-y-0.5 shadow-xs ${bg}`}>
+              className={`p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center rounded-2xl border transition-all hover:-translate-y-0.5 shadow-xs ${bg}`}>
               <Icon size={20} className="text-ony-blue" />
-              <span className="text-slate-800 text-xs font-bold">{label}</span>
+              <span className="text-slate-800 text-xs font-bold truncate w-full">{label}</span>
             </Link>
           ))}
         </div>

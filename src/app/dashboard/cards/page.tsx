@@ -301,29 +301,29 @@ export default function CardsPage() {
   const currentPlatform = PLATFORM_OPTIONS[linkForm.icon_type] ?? PLATFORM_OPTIONS.other
 
   return (
-    <div className="max-w-5xl mx-auto text-slate-900 relative">
+    <div className="max-w-5xl w-full mx-auto text-slate-900 relative min-w-0 space-y-6">
       
       {/* Success / Error Floating Toast Notification */}
       {toast && (
         <div className={cn(
-          'fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold animate-bounce-in',
+          'fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold animate-bounce-in max-w-[90vw]',
           toast.type === 'success'
             ? 'bg-slate-900 text-white border-slate-800'
             : 'bg-rose-600 text-white border-rose-700'
         )}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} />}
-          <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white">
+          {toast.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400 shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
+          <span className="truncate">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white shrink-0">
             <X size={16} />
           </button>
         </div>
       )}
 
       {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-1 tracking-tight">My Media</h1>
-          <p className="text-slate-600 text-sm">Kelola profil, tautan interaktif, dan riwayat akses kartu NFC & QR kamu.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 tracking-tight font-display">My Media</h1>
+          <p className="text-slate-600 text-xs sm:text-sm">Kelola profil, tautan interaktif, dan riwayat akses kartu NFC & QR kamu.</p>
         </div>
 
         {selected && (
@@ -333,7 +333,7 @@ export default function CardsPage() {
               setModalError(null)
               setAddingLink(true)
             }}
-            className="btn-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold shadow-sm"
+            className="btn-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold shadow-sm self-start sm:self-auto"
           >
             <Plus size={16} />
             Tambah Link Baru
@@ -342,19 +342,19 @@ export default function CardsPage() {
       </div>
 
       {safeCards.length === 0 ? (
-        <div className="card-surface p-12 text-center bg-white border border-slate-200 shadow-sm rounded-2xl">
+        <div className="card-surface p-8 sm:p-12 text-center bg-white border border-slate-200 shadow-sm rounded-2xl">
           <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
             <Wifi size={32} className="text-ony-blue" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Belum Ada Media Terhubung</h2>
-          <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-2 font-display">Belum Ada Media Terhubung</h2>
+          <p className="text-slate-600 text-xs sm:text-sm max-w-md mx-auto mb-6">
             Dekatkan HP kamu ke kartu NFC Ony atau scan QR Code pada media baru untuk mengaktifkannya.
           </p>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
           {/* Left: Card Selection List */}
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Daftar Media ({safeCards.length})</div>
             {safeCards.map(card => {
               const CardIcon = MEDIA_ICONS[card.media_type] ?? CreditCard
@@ -364,21 +364,21 @@ export default function CardsPage() {
                   key={card.id}
                   onClick={() => { setSelected(card); setActiveTab('editor'); }}
                   className={cn(
-                    'w-full text-left p-4 rounded-xl border transition-all shadow-sm flex items-center gap-3.5',
+                    'w-full text-left p-3.5 sm:p-4 rounded-xl border transition-all shadow-sm flex items-center gap-3.5 min-w-0',
                     isSelected
                       ? 'bg-blue-50/90 border-blue-300 text-slate-900 font-semibold ring-2 ring-blue-500/20'
                       : 'bg-white hover:border-blue-200 text-slate-700 border-slate-200'
                   )}
                 >
                   <div className={cn(
-                    'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border',
+                    'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border',
                     isSelected ? 'bg-ony-blue text-white border-blue-600' : 'bg-slate-50 text-slate-700 border-slate-200'
                   )}>
-                    <CardIcon size={20} />
+                    <CardIcon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate text-slate-900">{card.card_name}</div>
-                    <div className="text-xs text-slate-500">{MEDIA_TYPE_LABELS[card.media_type]} · {card.activation_code}</div>
+                    <div className="font-bold text-sm truncate text-slate-900 font-display">{card.card_name}</div>
+                    <div className="text-[11px] sm:text-xs text-slate-500 truncate">{MEDIA_TYPE_LABELS[card.media_type]} · {card.activation_code}</div>
                   </div>
                   <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase shrink-0', STATUS_COLORS[card.status])}>
                     {card.status}
@@ -390,15 +390,15 @@ export default function CardsPage() {
 
           {/* Right: Card Configuration Editor */}
           {selected && (
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-6 min-w-0">
               
               {/* Header Navigation Tabs */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div className="flex gap-2">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setActiveTab('editor')}
                     className={cn(
-                      'px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2',
+                      'px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
                       activeTab === 'editor'
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:text-slate-900'
@@ -409,13 +409,13 @@ export default function CardsPage() {
                   <button
                     onClick={() => setActiveTab('logs')}
                     className={cn(
-                      'px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2',
+                      'px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
                       activeTab === 'logs'
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:text-slate-900'
                     )}
                   >
-                    <Activity size={14} /> Riwayat Tap Hari Ini ({logs.length})
+                    <Activity size={14} /> Riwayat Tap ({logs.length})
                   </button>
                 </div>
 
@@ -423,44 +423,44 @@ export default function CardsPage() {
                   href={`/c/${selected.activation_code}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-ony-blue text-xs font-bold hover:underline bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"
+                  className="flex items-center gap-1.5 text-ony-blue text-xs font-bold hover:underline bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shrink-0"
                 >
-                  <Eye size={14} /> Lihat Profil Publik
+                  <Eye size={14} /> Lihat Profil
                 </a>
               </div>
 
               {activeTab === 'editor' ? (
                 <>
                   {/* Card Settings (Manual Save Only) */}
-                  <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl">
-                    <h2 className="text-base font-bold text-slate-900 mb-4">Informasi & Mode Respons Kartu</h2>
+                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display">Informasi & Mode Respons Kartu</h2>
 
-                    <div className="space-y-5">
+                    <div className="space-y-4 sm:space-y-5">
                       <div>
                         <label className="text-slate-700 text-xs mb-1.5 block font-semibold">Nama / Label Kartu</label>
                         <input
-                          className="input-field text-sm"
+                          className="input-field text-xs sm:text-sm"
                           value={selected.card_name}
                           onChange={e => setSelected({ ...selected, card_name: e.target.value })}
                           placeholder="Kartu Bisnis Utama"
                         />
                       </div>
 
-                      {/* Mode Selection (Updates Local State Only Until Save Button Clicked) */}
+                      {/* Mode Selection */}
                       <div>
                         <label className="text-slate-700 text-xs mb-2 block font-semibold">Modus Respons Tap NFC / Scan QR</label>
-                        <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200 min-w-0">
                           <button
                             type="button"
                             onClick={() => setSelected({ ...selected, mode: 'profile' })}
                             className={cn(
-                              'py-3 px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
+                              'py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
                               selected.mode === 'profile'
                                 ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1.5 font-display">
                               <Globe size={14} /> Profile Mode
                             </span>
                             <span className="text-[10px] text-slate-500 font-normal">Tampilkan halaman profil & daftar link</span>
@@ -470,13 +470,13 @@ export default function CardsPage() {
                             type="button"
                             onClick={() => setSelected({ ...selected, mode: 'direct' })}
                             className={cn(
-                              'py-3 px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
+                              'py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
                               selected.mode === 'direct'
                                 ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1.5 font-display">
                               <ExternalLink size={14} /> Direct Redirect Mode
                             </span>
                             <span className="text-[10px] text-slate-500 font-normal">Langsung alihkan ke URL / WhatsApp</span>
@@ -615,29 +615,29 @@ export default function CardsPage() {
                 </>
               ) : (
                 /* Today's Tap Activity Logs */
-                <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl">
-                  <div className="flex items-center justify-between mb-5">
+                <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-2">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900">Riwayat Tap NFC & QR Scan Hari Ini</h2>
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 font-display">Riwayat Tap NFC & QR Scan Hari Ini</h2>
                       <p className="text-slate-500 text-xs">Catatan interaksi publik khusus hari ini pada kartu ini.</p>
                     </div>
 
                     <button
                       onClick={loadCardDetails}
                       disabled={loadingLogs}
-                      className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg font-semibold"
+                      className="flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto"
                     >
                       <RefreshCw size={12} className={cn(loadingLogs && 'animate-spin')} /> Refresh Log
                     </button>
                   </div>
 
                   {logs.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-sm">
+                    <div className="text-center py-10 text-slate-400 text-sm font-medium">
                       Belum ada catatan interaksi tap atau scan khusus hari ini untuk kartu ini.
                     </div>
                   ) : (
                     <>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto min-w-0 w-full rounded-xl border border-slate-200/80">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-left bg-slate-50">
@@ -661,9 +661,9 @@ export default function CardsPage() {
                                     {log.access_method === 'nfc_tap' ? 'NFC Tap' : 'QR Scan'}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-slate-700 font-medium">{formatDate(log.tapped_at)}</td>
-                                <td className="px-4 py-3 font-mono text-slate-500">{log.ip_address ?? '—'}</td>
-                                <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{log.user_agent ?? '—'}</td>
+                                <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">{formatDate(log.tapped_at)}</td>
+                                <td className="px-4 py-3 font-mono text-slate-500 whitespace-nowrap">{log.ip_address ?? '—'}</td>
+                                <td className="px-4 py-3 text-slate-500 max-w-[180px] sm:max-w-[240px] truncate">{log.user_agent ?? '—'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -672,9 +672,9 @@ export default function CardsPage() {
 
                       {/* Pagination Controls */}
                       {logs.length > LOGS_PER_PAGE && (
-                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200 text-xs">
-                          <div className="text-slate-500 font-medium">
-                            Menampilkan {(logsPage - 1) * LOGS_PER_PAGE + 1}–{Math.min(logsPage * LOGS_PER_PAGE, logs.length)} dari {logs.length} log harian
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200 text-xs">
+                          <div className="text-slate-500 font-medium text-center sm:text-left">
+                            Menampilkan {(logsPage - 1) * LOGS_PER_PAGE + 1}–{Math.min(logsPage * LOGS_PER_PAGE, logs.length)} dari {logs.length} log
                           </div>
 
                           <div className="flex items-center gap-2">

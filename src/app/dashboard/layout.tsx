@@ -14,8 +14,7 @@ const NAV = [
   { href: '/dashboard',            label: 'Overview',   icon: LayoutDashboard },
   { href: '/dashboard/cards',      label: 'My Media',   icon: CreditCard },
   { href: '/dashboard/analytics',  label: 'Analytics',  icon: BarChart2 },
-  { href: '/dashboard/qr-studio',  label: 'QR Studio',  icon: QrCode },
-  { href: '/dashboard/store',      label: 'Store',      icon: ShoppingBag },
+  { href: '/dashboard/store',      label: 'Official Store', icon: ShoppingBag },
   { href: '/dashboard/settings',   label: 'Settings',   icon: Settings },
 ]
 
@@ -142,10 +141,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Container */}
-      <div className="flex-1 lg:ml-64 min-h-screen flex flex-col bg-slate-50">
+      <div className="flex-1 lg:ml-64 min-h-screen flex flex-col bg-slate-50 min-w-0 overflow-x-hidden">
         {/* Mobile Navbar Header */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-20">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-700 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-700 hover:text-slate-900 p-1.5 rounded-xl hover:bg-slate-100 transition-colors">
             <Menu size={22} />
           </button>
           <div className="flex items-center">
@@ -154,7 +153,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="w-8" />
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto min-w-0">
           {children}
         </main>
       </div>

@@ -48,19 +48,19 @@ export default function AnalyticsPage() {
   })) : []
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Analytics</h1>
-        <p className="text-slate-600">Pantau performa kartu NFC & QR kamu secara real-time.</p>
+    <div className="max-w-5xl w-full mx-auto min-w-0 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">Analytics</h1>
+        <p className="text-slate-600 text-xs sm:text-sm">Pantau performa kartu NFC & QR kamu secara real-time.</p>
       </div>
 
       {/* Period Selector */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2">
         {[7, 30, 90].map(d => (
           <button
             key={d}
             onClick={() => setPeriod(d)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all shadow-xs ${
+            className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all shadow-xs ${
               period === d
                 ? 'bg-ony-blue text-white'
                 : 'border border-slate-200 text-slate-600 hover:text-slate-900 bg-white'
@@ -72,25 +72,27 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         {metrics.map(({ label, value, icon: Icon, color, bg, desc }) => (
-          <div key={label} className="card-surface p-5">
-            <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+          <div key={label} className="card-surface p-3.5 sm:p-5 min-w-0">
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 ${bg} rounded-xl flex items-center justify-center mb-2.5`}>
               <Icon size={18} className={color} />
             </div>
-            <div className="text-2xl font-bold text-slate-900 mb-0.5">{formatNumber(value)}</div>
-            <div className="text-slate-800 text-xs font-semibold mb-0.5">{label}</div>
-            <div className="text-slate-500 text-xs">{desc}</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mb-0.5 font-display">{formatNumber(value)}</div>
+            <div className="text-slate-800 text-xs font-semibold mb-0.5 truncate">{label}</div>
+            <div className="text-slate-500 text-[11px] sm:text-xs truncate">{desc}</div>
           </div>
         ))}
       </div>
 
       {/* Chart */}
-      <div className="card-surface p-6 mb-6">
-        <div className="flex items-center gap-2 mb-6">
-          <TrendingUp size={18} className="text-ony-blue" />
-          <h2 className="text-lg font-bold text-slate-900">Tren Interaksi</h2>
-          <span className="text-slate-500 text-xs ml-auto">{period} hari terakhir</span>
+      <div className="card-surface p-4 sm:p-6 min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 mb-6">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={18} className="text-ony-blue" />
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 font-display">Tren Interaksi</h2>
+          </div>
+          <span className="text-slate-500 text-xs font-medium">{period} hari terakhir</span>
         </div>
 
         {chartData.length === 0 ? (
@@ -133,8 +135,8 @@ export default function AnalyticsPage() {
       </div>
 
       {/* NFC vs QR Breakdown */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card-surface p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+        <div className="card-surface p-4 sm:p-6 min-w-0">
           <h3 className="text-sm font-bold text-slate-900 mb-4">Sumber Interaksi</h3>
           <div className="space-y-3">
             {[
