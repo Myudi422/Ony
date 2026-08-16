@@ -31,12 +31,54 @@ export default function QRStudioPage() {
     ? `${typeof window !== 'undefined' ? window.location.origin : 'https://ony.id'}/c/${selected.activation_code}`
     : ''
 
-  const downloadSVG = () => {
+  const getLogoBase64 = async (): Promise<string> => {
+    try {
+      const res = await fetch('/logo.png')
+      const blob = await res.blob()
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve((reader.result as string) || '')
+        reader.readAsDataURL(blob)
+      })
+    } catch (_) {
+      return ''
+    }
+  }
+
+  const injectCircularBadge = (svgStr: string, bg = '#FFFFFF') => {
+    if (!svgStr.includes('<image')) return svgStr
+    const xMatch = svgStr.match(/<image[^>]*\bx="([^"]+)"/)
+    const yMatch = svgStr.match(/<image[^>]*\by="([^"]+)"/)
+    const wMatch = svgStr.match(/<image[^>]*\bwidth="([^"]+)"/)
+    if (!xMatch || !yMatch || !wMatch) return svgStr
+
+    const x = parseFloat(xMatch[1])
+    const y = parseFloat(yMatch[1])
+    const w = parseFloat(wMatch[1])
+
+    const cx = (x + w / 2).toFixed(2)
+    const cy = (y + w / 2).toFixed(2)
+    const r = (w * 0.65).toFixed(2)
+
+    const circleElement = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${bg}" stroke="#E2E8F0" stroke-width="1.5" />`
+    return svgStr.replace(/<image /g, `${circleElement}<image `)
+  }
+
+  const downloadSVG = async () => {
     if (!svgRef.current) return
     const svg = svgRef.current.querySelector('svg')
     if (!svg) return
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const blob = new Blob([svgData], { type: 'image/svg+xml' })
+
+    let svgData = new XMLSerializer().serializeToString(svg)
+    const logoBase64 = await getLogoBase64()
+
+    if (logoBase64) {
+      svgData = svgData.replace(/href="\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = svgData.replace(/href="http[^"]*\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = injectCircularBadge(svgData, bgColor)
+    }
+
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -45,24 +87,37 @@ export default function QRStudioPage() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadPNG = () => {
+  const downloadPNG = async () => {
     if (!svgRef.current) return
     const svg = svgRef.current.querySelector('svg')
     if (!svg) return
+
+    let svgData = new XMLSerializer().serializeToString(svg)
+    const logoBase64 = await getLogoBase64()
+
+    if (logoBase64) {
+      svgData = svgData.replace(/href="\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = svgData.replace(/href="http[^"]*\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = injectCircularBadge(svgData, bgColor)
+    }
+
     const canvas = document.createElement('canvas')
-    canvas.width = size * 2
-    canvas.height = size * 2
-    const ctx = canvas.getContext('2d')!
+    const targetSize = Math.max(600, size * 2)
+    canvas.width = targetSize
+    canvas.height = targetSize
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
     const img = new window.Image()
-    const svgData = new XMLSerializer().serializeToString(svg)
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData)
     img.onload = () => {
-      ctx.drawImage(img, 0, 0, size * 2, size * 2)
+      ctx.drawImage(img, 0, 0, targetSize, targetSize)
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
       a.download = `ony-qr-${selected?.activation_code ?? 'code'}.png`
       a.click()
     }
+
+    img.src = 'data:image/svg+xml;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(svgData)))
   }
 
   const presets = [
@@ -187,17 +242,18 @@ export default function QRStudioPage() {
             <div className="text-slate-600 text-xs font-semibold uppercase tracking-wider mb-4 w-full">Preview</div>
 
             {qrUrl ? (
-              <div ref={svgRef} className="rounded-2xl p-6 mb-4 shadow-sm border border-slate-200/80" style={{ background: bgColor }}>
+              <div ref={svgRef} className="rounded-3xl p-6 mb-4 shadow-xl border border-slate-200/90 relative overflow-hidden transition-all" style={{ background: bgColor }}>
                 <QRCodeSVG
                   value={qrUrl}
                   size={size}
                   fgColor={fgColor}
                   bgColor={bgColor}
                   level={errorLevel}
+                  marginSize={1}
                   imageSettings={{
                     src: '/logo.png',
-                    height: Math.round(size * 0.15),
-                    width: Math.round(size * 0.15),
+                    height: Math.round(size * 0.20),
+                    width: Math.round(size * 0.20),
                     excavate: true,
                   }}
                 />

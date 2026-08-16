@@ -51,18 +51,18 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">User Management</h1>
-        <p className="text-slate-600">{total} user terdaftar</p>
+    <div className="max-w-6xl w-full mx-auto min-w-0 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">User Management</h1>
+        <p className="text-slate-600 text-xs sm:text-sm">{total} user terdaftar</p>
       </div>
 
       {/* Search */}
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1">
+      <div className="flex gap-3 min-w-0">
+        <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="input-field pl-9 w-full"
+            className="input-field pl-9 w-full text-xs sm:text-sm"
             placeholder="Cari nama atau email..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -71,8 +71,8 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Table */}
-      <div className="card-surface overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="card-surface overflow-hidden min-w-0 w-full">
+        <div className="overflow-x-auto min-w-0 w-full">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/50">

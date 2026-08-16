@@ -32,27 +32,27 @@ export default function AdminOverviewPage() {
   ]
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Admin Overview</h1>
-        <p className="text-slate-600">Kontrol ekosistem Ony dari satu panel.</p>
+    <div className="max-w-5xl w-full mx-auto min-w-0 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">Admin Overview</h1>
+        <p className="text-slate-600 text-xs sm:text-sm">Kontrol ekosistem Ony dari satu panel.</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         {metrics.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="card-surface p-5">
-            <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+          <div key={label} className="card-surface p-4 sm:p-5">
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 ${bg} rounded-xl flex items-center justify-center mb-3`}>
               <Icon size={18} className={color} />
             </div>
-            <div className="text-2xl font-bold text-slate-900 mb-0.5">{value}</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mb-0.5">{value}</div>
             <div className="text-slate-500 text-xs font-medium">{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="card-surface p-6">
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="card-surface p-5 sm:p-6 min-w-0">
+        <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-4 font-display">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 min-w-0">
           {[
             { href: '/admin/users',  label: 'Kelola Users',    emoji: '👥' },
             { href: '/admin/media',  label: 'Generate Kode',   emoji: '📲' },

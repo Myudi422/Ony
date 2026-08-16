@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Plus, Download, RefreshCw, Unlink, QrCode, Copy, Check,
   ExternalLink, Eye, X, Trash2, Search, Filter, Calendar, RotateCcw,
-  CreditCard, Tag, ShieldAlert
+  CreditCard, Tag, ShieldAlert, Palette
 } from 'lucide-react'
 import { formatDate, MEDIA_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,10 @@ export default function AdminMediaPage() {
   // Action & Modal State
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [previewCard, setPreviewCard] = useState<Card | null>(null)
+  const [qrFgColor, setQrFgColor] = useState('#0F172A')
+  const [qrBgColor, setQrBgColor] = useState('#FFFFFF')
+  const [qrFrameStyle, setQrFrameStyle] = useState<'dark' | 'light' | 'minimal'>('dark')
+  const [showLogo, setShowLogo] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
 
@@ -136,6 +140,97 @@ export default function AdminMediaPage() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
+  const getLogoBase64 = async (): Promise<string> => {
+    try {
+      const res = await fetch('/logo.png')
+      const blob = await res.blob()
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve((reader.result as string) || '')
+        reader.readAsDataURL(blob)
+      })
+    } catch (_) {
+      return ''
+    }
+  }
+
+  const injectCircularBadge = (svgStr: string, bgColor = '#FFFFFF') => {
+    if (!svgStr.includes('<image')) return svgStr
+    const xMatch = svgStr.match(/<image[^>]*\bx="([^"]+)"/)
+    const yMatch = svgStr.match(/<image[^>]*\by="([^"]+)"/)
+    const wMatch = svgStr.match(/<image[^>]*\bwidth="([^"]+)"/)
+
+    if (!xMatch || !yMatch || !wMatch) return svgStr
+
+    const x = parseFloat(xMatch[1])
+    const y = parseFloat(yMatch[1])
+    const w = parseFloat(wMatch[1])
+
+    const cx = (x + w / 2).toFixed(2)
+    const cy = (y + w / 2).toFixed(2)
+    const r = (w * 0.65).toFixed(2)
+
+    const circleElement = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${bgColor}" stroke="#E2E8F0" stroke-width="1.5" />`
+    return svgStr.replace(/<image /g, `${circleElement}<image `)
+  }
+
+  const downloadQRSVG = async (code: string, elementId: string) => {
+    const container = document.getElementById(elementId)
+    if (!container) return
+    const svg = (container.querySelector('svg.ony-qr-code-svg') || container.querySelector('svg:not([class*="lucide"])') || container.querySelector('svg')) as SVGElement | null
+    if (!svg) return
+
+    let svgData = new XMLSerializer().serializeToString(svg)
+    const logoBase64 = await getLogoBase64()
+
+    if (logoBase64) {
+      svgData = svgData.replace(/href="\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = svgData.replace(/href="http[^"]*\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = injectCircularBadge(svgData, qrBgColor)
+    }
+
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ony-qr-${code}.svg`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadQRPNG = async (code: string, elementId: string, size = 600) => {
+    const container = document.getElementById(elementId)
+    if (!container) return
+    const svg = (container.querySelector('svg.ony-qr-code-svg') || container.querySelector('svg:not([class*="lucide"])') || container.querySelector('svg')) as SVGElement | null
+    if (!svg) return
+
+    let svgData = new XMLSerializer().serializeToString(svg)
+    const logoBase64 = await getLogoBase64()
+
+    if (logoBase64) {
+      svgData = svgData.replace(/href="\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = svgData.replace(/href="http[^"]*\/logo\.png"/g, `href="${logoBase64}"`)
+      svgData = injectCircularBadge(svgData, qrBgColor)
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const img = new Image()
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, size, size)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `ony-qr-${code}.png`
+      a.click()
+    }
+
+    img.src = 'data:image/svg+xml;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
   const unbind = async (cardId: string) => {
     if (!confirm('Unbind kartu ini dari pengguna? Seluruh daftar link dan riwayat tap kartu ini akan dihapus bersih.')) return
     try {
@@ -182,26 +277,26 @@ export default function AdminMediaPage() {
   const hasActiveFilters = search || filterPayment !== 'all' || filterStatus !== 'all' || startDate || endDate
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl w-full mx-auto space-y-5 sm:space-y-6 min-w-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-1">Media Generator (NFC + QR)</h1>
-          <p className="text-slate-600 text-sm">Kelola seluruh media fisik NFC, cetak QR Code, dan filter status pembayaran.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">Media Generator (NFC + QR)</h1>
+          <p className="text-slate-600 text-xs sm:text-sm">Kelola seluruh media fisik NFC, cetak QR Code, dan filter status pembayaran.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button onClick={load} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-xs transition-all" title="Reload Data">
             <RefreshCw size={16} />
           </button>
-          <button onClick={exportCSV} className="btn-primary text-xs py-2.5 px-4 flex items-center gap-2 shadow-sm font-semibold">
+          <button onClick={exportCSV} className="btn-primary text-xs py-2.5 px-3.5 sm:px-4 flex items-center gap-2 shadow-sm font-semibold">
             <Download size={14} />
-            Export CSV ({total} Media)
+            Export CSV ({total})
           </button>
         </div>
       </div>
 
       {/* Top Grid: Batch Generator + Overview */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Batch Generator */}
         <div className="card-surface p-6 bg-white border border-slate-200/90 rounded-2xl shadow-sm">
           <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -301,35 +396,74 @@ export default function AdminMediaPage() {
               const nfcUrl = `${baseUrl}/c/${c.activation_code}`
               const isCopied = copiedCode === c.activation_code
               const isUnpaid = c.payment_status === 'unpaid' || c.redirect_url === 'UNPAID'
+              const containerId = `qr-gen-${c.activation_code}`
               return (
-                <div key={c.id} className="card-surface p-4 flex flex-col items-center text-center bg-white border-slate-200 shadow-xs rounded-xl">
-                  <div className="p-2.5 bg-white rounded-xl mb-2 border border-slate-200 shadow-2xs">
-                    <QRCodeSVG value={nfcUrl} size={100} level="M" />
+                <div key={c.id} className="card-surface p-4 flex flex-col items-center text-center bg-white border-slate-200/90 shadow-sm rounded-2xl relative overflow-hidden group hover:border-blue-300 transition-all">
+                  {/* Styled QR Badge Container */}
+                  <div className="p-3 bg-slate-900 text-white rounded-2xl mb-3 border border-slate-800 shadow-md flex flex-col items-center w-full relative">
+                    <div className="text-[9px] font-extrabold text-blue-300 uppercase tracking-widest mb-2 font-display">
+                      TAP OR SCAN ME
+                    </div>
+                    <div id={containerId} className="p-2 bg-white rounded-xl shadow-inner">
+                      <QRCodeSVG
+                        className="ony-qr-code-svg"
+                        value={nfcUrl}
+                        size={110}
+                        fgColor="#0F172A"
+                        bgColor="#FFFFFF"
+                        level="H"
+                        marginSize={1}
+                        imageSettings={{
+                          src: '/logo.png',
+                          height: 24,
+                          width: 24,
+                          excavate: true,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-ony-blue font-mono font-bold text-sm mb-1">{c.activation_code}</div>
-                  <div className="text-slate-500 text-[11px] font-mono truncate w-full mb-2 bg-slate-50 p-1 rounded border border-slate-200">
+
+                  <div className="text-ony-blue font-mono font-extrabold text-sm mb-1">{c.activation_code}</div>
+                  <div className="text-slate-500 text-[11px] font-mono truncate w-full mb-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                     {nfcUrl}
                   </div>
-                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full mb-3', isUnpaid ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200')}>
+                  <span className={cn('text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mb-3 uppercase tracking-wider', isUnpaid ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200')}>
                     {isUnpaid ? '💳 Blangko (Unpaid)' : '✓ Pre-Paid'}
                   </span>
-                  <div className="flex gap-2 w-full mt-auto">
-                    <button
-                      onClick={() => copyToClipboard(nfcUrl, c.activation_code)}
-                      className="flex-1 btn-ghost text-xs py-1.5 flex items-center justify-center gap-1 border border-slate-200"
-                    >
-                      {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                      {isCopied ? 'Tersalin' : 'Salin URL'}
-                    </button>
-                    <a
-                      href={nfcUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg bg-blue-50 text-ony-blue border border-blue-200"
-                      title="Buka Link NFC"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
+                  
+                  <div className="flex flex-col gap-1.5 w-full mt-auto">
+                    <div className="flex gap-1.5 w-full">
+                      <button
+                        onClick={() => copyToClipboard(nfcUrl, c.activation_code)}
+                        className="flex-1 btn-ghost text-xs py-1.5 flex items-center justify-center gap-1 border border-slate-200 font-semibold"
+                      >
+                        {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                        {isCopied ? 'Tersalin' : 'Salin URL'}
+                      </button>
+                      <a
+                        href={nfcUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-xl bg-blue-50 text-ony-blue border border-blue-200 flex items-center justify-center hover:bg-blue-100 transition-colors"
+                        title="Buka Link NFC"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                    </div>
+                    <div className="flex gap-1.5 w-full">
+                      <button
+                        onClick={() => downloadQRPNG(c.activation_code, containerId)}
+                        className="flex-1 btn-ghost text-[11px] py-1.5 flex items-center justify-center gap-1 border border-slate-200 font-semibold"
+                      >
+                        <Download size={11} /> PNG
+                      </button>
+                      <button
+                        onClick={() => downloadQRSVG(c.activation_code, containerId)}
+                        className="flex-1 btn-ghost text-[11px] py-1.5 flex items-center justify-center gap-1 border border-slate-200 font-semibold"
+                      >
+                        <Download size={11} /> SVG
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -438,13 +572,13 @@ export default function AdminMediaPage() {
       )}
 
       {/* CARDS LIST TABLE */}
-      <div className="card-surface overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-          <h3 className="font-bold text-slate-900 text-sm">Daftar Seluruh Media NFC & QR</h3>
+      <div className="card-surface overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm min-w-0 w-full">
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-slate-50/50">
+          <h3 className="font-bold text-slate-900 text-sm font-display">Daftar Seluruh Media NFC & QR</h3>
           <span className="text-slate-500 text-xs font-mono">Menampilkan {cards.length} dari {total} Media</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -506,7 +640,17 @@ export default function AdminMediaPage() {
                         className="p-1 bg-white rounded-lg hover:scale-105 transition-transform border border-slate-200 shadow-2xs"
                         title="Perbesar QR"
                       >
-                        <QRCodeSVG value={nfcUrl} size={34} level="L" />
+                        <QRCodeSVG
+                          value={nfcUrl}
+                          size={36}
+                          level="H"
+                          imageSettings={{
+                            src: '/logo.png',
+                            height: 8,
+                            width: 8,
+                            excavate: true,
+                          }}
+                        />
                       </button>
                     </td>
 
@@ -622,33 +766,232 @@ export default function AdminMediaPage() {
       {/* Modal Preview QR & NFC Link */}
       <Dialog open={!!previewCard} onOpenChange={open => !open && setPreviewCard(null)}>
         {previewCard && (
-          <DialogContent className="max-w-sm text-center bg-white border-slate-200 shadow-xl rounded-2xl p-6">
+          <DialogContent className="max-w-md bg-white border-slate-200 shadow-2xl rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
             <DialogHeader className="text-center sm:text-center">
-              <DialogTitle className="text-lg font-bold text-slate-900">Preview NFC & QR Code</DialogTitle>
+              <DialogTitle className="text-lg font-bold text-slate-900 font-display flex items-center justify-center gap-2">
+                <Palette size={18} className="text-ony-blue" />
+                Desain & Kustomisasi QR
+              </DialogTitle>
               <DialogDescription className="text-xs text-slate-500">
                 Kode Aktivasi: <span className="text-ony-blue font-mono font-bold">{previewCard.activation_code}</span>
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex flex-col items-center py-2">
-              <div className="p-4 bg-white rounded-2xl mb-4 border border-slate-200 shadow-md">
-                <QRCodeSVG value={`${baseUrl}/c/${previewCard.activation_code}`} size={180} level="H" />
+            <div className="flex flex-col items-center py-2 space-y-4">
+              {/* Mockup Frame Preview (Dark / Light / Minimal) */}
+              {qrFrameStyle === 'dark' && (
+                <div className="w-full p-5 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-extrabold uppercase tracking-widest mb-4 font-display">
+                    <CreditCard size={12} className="text-cyan-400" /> ONY SMART MEDIA
+                  </div>
+                  <div id={`qr-preview-${previewCard.activation_code}`} className="relative p-3.5 rounded-2xl shadow-2xl border border-slate-200/20 mb-3 flex items-center justify-center" style={{ background: qrBgColor }}>
+                    <QRCodeSVG
+                      className="ony-qr-code-svg"
+                      value={`${baseUrl}/c/${previewCard.activation_code}`}
+                      size={180}
+                      fgColor={qrFgColor}
+                      bgColor={qrBgColor}
+                      level="H"
+                      marginSize={1}
+                      imageSettings={showLogo ? {
+                        src: '/logo.png',
+                        height: 38,
+                        width: 38,
+                        excavate: true,
+                      } : undefined}
+                    />
+                    {showLogo && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-12 h-12 rounded-full p-1 shadow-md border border-slate-200/80 flex items-center justify-center" style={{ background: qrBgColor }}>
+                          <img src="/logo.png" alt="Ony Logo" className="w-full h-full object-contain rounded-full" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-300 font-mono tracking-wider">
+                    TAP NFC OR SCAN QR
+                  </div>
+                </div>
+              )}
+
+              {qrFrameStyle === 'light' && (
+                <div className="w-full p-5 bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden flex flex-col items-center">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-ony-blue text-[10px] font-extrabold uppercase tracking-widest mb-4 font-display">
+                    <CreditCard size={12} className="text-ony-blue" /> ONY SMART MEDIA
+                  </div>
+                  <div id={`qr-preview-${previewCard.activation_code}`} className="relative p-3.5 rounded-2xl shadow-lg border border-slate-200 mb-3 flex items-center justify-center" style={{ background: qrBgColor }}>
+                    <QRCodeSVG
+                      className="ony-qr-code-svg"
+                      value={`${baseUrl}/c/${previewCard.activation_code}`}
+                      size={180}
+                      fgColor={qrFgColor}
+                      bgColor={qrBgColor}
+                      level="H"
+                      marginSize={1}
+                      imageSettings={showLogo ? {
+                        src: '/logo.png',
+                        height: 38,
+                        width: 38,
+                        excavate: true,
+                      } : undefined}
+                    />
+                    {showLogo && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-12 h-12 rounded-full p-1 shadow-md border border-slate-200/80 flex items-center justify-center" style={{ background: qrBgColor }}>
+                          <img src="/logo.png" alt="Ony Logo" className="w-full h-full object-contain rounded-full" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-600 font-mono tracking-wider">
+                    TAP NFC OR SCAN QR
+                  </div>
+                </div>
+              )}
+
+              {qrFrameStyle === 'minimal' && (
+                <div className="w-full p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col items-center justify-center">
+                  <div id={`qr-preview-${previewCard.activation_code}`} className="relative p-4 rounded-2xl shadow-md border border-slate-200 flex items-center justify-center" style={{ background: qrBgColor }}>
+                    <QRCodeSVG
+                      className="ony-qr-code-svg"
+                      value={`${baseUrl}/c/${previewCard.activation_code}`}
+                      size={190}
+                      fgColor={qrFgColor}
+                      bgColor={qrBgColor}
+                      level="H"
+                      marginSize={1}
+                      imageSettings={showLogo ? {
+                        src: '/logo.png',
+                        height: 40,
+                        width: 40,
+                        excavate: true,
+                      } : undefined}
+                    />
+                    {showLogo && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-12 h-12 rounded-full p-1 shadow-md border border-slate-200/80 flex items-center justify-center" style={{ background: qrBgColor }}>
+                          <img src="/logo.png" alt="Ony Logo" className="w-full h-full object-contain rounded-full" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Customization Controls Accordion / Panel */}
+              <div className="w-full space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left">
+                {/* Frame Style Selector */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2 font-display">Style Frame Mockup</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'dark', name: 'Ony Dark' },
+                      { id: 'light', name: 'Ony Light' },
+                      { id: 'minimal', name: 'Minimal' },
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setQrFrameStyle(f.id as any)}
+                        className={cn('py-1.5 px-2 rounded-xl text-xs font-bold transition-all border text-center',
+                          qrFrameStyle === f.id ? 'bg-slate-900 text-white border-slate-900 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        )}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Color Presets */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2 font-display">Preset Warna QR</label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[
+                      { name: 'Slate', fg: '#0F172A', bg: '#FFFFFF' },
+                      { name: 'Blue', fg: '#087CFF', bg: '#FFFFFF' },
+                      { name: 'Indigo', fg: '#4F46E5', bg: '#FFFFFF' },
+                      { name: 'Emerald', fg: '#059669', bg: '#FFFFFF' },
+                      { name: 'Invert', fg: '#FFFFFF', bg: '#0F172A' },
+                    ].map(p => (
+                      <button
+                        key={p.name}
+                        onClick={() => { setQrFgColor(p.fg); setQrBgColor(p.bg) }}
+                        className="flex flex-col items-center p-1.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 transition-all"
+                        title={p.name}
+                      >
+                        <div className="w-6 h-6 rounded-lg border border-slate-200 flex items-center justify-center" style={{ background: p.bg }}>
+                          <div className="w-3 h-3 rounded-xs" style={{ background: p.fg }} />
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-600 mt-1">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Color Pickers */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Warna QR</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={qrFgColor} onChange={e => setQrFgColor(e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 bg-white" />
+                      <span className="font-mono text-xs font-bold text-slate-700">{qrFgColor}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Background</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={qrBgColor} onChange={e => setQrBgColor(e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 bg-white" />
+                      <span className="font-mono text-xs font-bold text-slate-700">{qrBgColor}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggle Logo */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-xs font-semibold text-slate-700">Tampilkan Logo Ony</span>
+                  <input
+                    type="checkbox"
+                    checked={showLogo}
+                    onChange={e => setShowLogo(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-ony-blue focus:ring-ony-blue cursor-pointer"
+                  />
+                </div>
               </div>
 
-              <div className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4 text-left">
-                <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Target NFC URL</div>
+              {/* Target URL */}
+              <div className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-left">
+                <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1 font-display">Target NFC URL</div>
                 <div className="text-ony-blue font-mono text-xs break-all">
                   {`${baseUrl}/c/${previewCard.activation_code}`}
                 </div>
               </div>
 
-              <button
-                onClick={() => copyToClipboard(`${baseUrl}/c/${previewCard.activation_code}`, previewCard.activation_code)}
-                className="w-full btn-primary py-2.5 text-xs flex items-center justify-center gap-2 font-medium"
-              >
-                {copiedCode === previewCard.activation_code ? <Check size={14} /> : <Copy size={14} />}
-                {copiedCode === previewCard.activation_code ? 'Link Tersalin!' : 'Salin NFC Link'}
-              </button>
+              {/* Action Buttons: Copy Link & Downloads */}
+              <div className="space-y-2 w-full">
+                <button
+                  onClick={() => copyToClipboard(`${baseUrl}/c/${previewCard.activation_code}`, previewCard.activation_code)}
+                  className="w-full btn-primary py-2.5 text-xs flex items-center justify-center gap-2 font-semibold shadow-xs"
+                >
+                  {copiedCode === previewCard.activation_code ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedCode === previewCard.activation_code ? 'Link Tersalin!' : 'Salin NFC Link'}
+                </button>
+
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  <button
+                    onClick={() => downloadQRPNG(previewCard.activation_code, `qr-preview-${previewCard.activation_code}`, 1200)}
+                    className="btn-ghost text-xs py-2.5 flex items-center justify-center gap-1.5 border border-slate-200 font-semibold text-slate-800"
+                  >
+                    <Download size={13} /> Unduh PNG HD
+                  </button>
+                  <button
+                    onClick={() => downloadQRSVG(previewCard.activation_code, `qr-preview-${previewCard.activation_code}`)}
+                    className="btn-ghost text-xs py-2.5 flex items-center justify-center gap-1.5 border border-slate-200 font-semibold text-slate-800"
+                  >
+                    <Download size={13} /> Unduh SVG Vector
+                  </button>
+                </div>
+              </div>
             </div>
           </DialogContent>
         )}

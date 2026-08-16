@@ -42,15 +42,15 @@ export default function AdminOrdersPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Order Management</h1>
-        <p className="text-slate-600">{orders.length} total pesanan</p>
+    <div className="max-w-5xl w-full mx-auto min-w-0 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">Order Management</h1>
+        <p className="text-slate-600 text-xs sm:text-sm">{orders.length} total pesanan</p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Orders List */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="lg:col-span-2 space-y-3 min-w-0">
           {orders.length === 0 ? (
             <div className="card-surface p-12 text-center">
               <Package size={40} className="text-slate-300 mx-auto mb-3" />

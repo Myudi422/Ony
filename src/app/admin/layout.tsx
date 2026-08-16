@@ -106,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Main Container */}
-      <div className="flex-1 lg:ml-60 min-h-screen flex flex-col bg-slate-50">
+      <div className="flex-1 lg:ml-60 min-h-screen flex flex-col bg-slate-50 min-w-0 overflow-x-hidden">
         {/* Mobile Header Bar */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-20 shadow-xs">
           <button
@@ -129,7 +129,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto min-w-0">
           {children}
         </main>
       </div>
