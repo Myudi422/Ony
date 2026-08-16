@@ -40,22 +40,27 @@ export default function ProfilePage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex justify-center text-slate-900">
-      {/* Mobile container */}
-      <div className="w-full max-w-md pt-10 pb-16 px-5">
+    <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center text-slate-900 py-8 px-4 sm:px-6 selection:bg-ony-blue selection:text-white">
+      {/* Background ambient lighting */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-blue-500/5 rounded-full blur-3xl" />
+      </div>
 
-        {/* Large Logo Header */}
-        <div className="flex justify-center mb-8">
+      {/* Main Profile Viewport Container */}
+      <div className="relative w-full max-w-md my-auto">
+        
+        {/* Brand Header */}
+        <div className="flex justify-center mb-6">
           <Link href="/" className="inline-block transition-transform hover:scale-105">
-            <Image src="/logo.png" alt="Ony" width={160} height={48} className="h-11 md:h-12 w-auto object-contain rounded" priority />
+            <Image src="/logo.png" alt="Ony" width={150} height={44} className="h-10 w-auto object-contain rounded" priority />
           </Link>
         </div>
 
-        {/* Profile Card */}
-        <div className="card-surface p-8 mb-5 text-center shadow-lg bg-white border border-slate-200/90 rounded-2xl relative overflow-hidden">
+        {/* Profile Card Header */}
+        <div className="card-surface p-7 mb-4 text-center shadow-lg bg-white border border-slate-200/90 rounded-3xl relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-ony-gradient" />
 
-          {/* Avatar */}
+          {/* Avatar Container */}
           <div className="relative w-24 h-24 mx-auto mb-4">
             {user.avatar_url ? (
               <Image
@@ -65,24 +70,23 @@ export default function ProfilePage({
                 className="rounded-full object-cover ring-4 ring-blue-100 shadow-md"
               />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md">
+              <div className="w-24 h-24 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md font-display">
                 {initials}
               </div>
             )}
-            {/* NFC Card Badge Indicator (Replaced Phone with Card Icon) */}
+            {/* NFC Card Badge Indicator */}
             <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border-2 border-blue-200 shadow-md flex items-center justify-center">
               <MediaIcon size={14} className="text-ony-blue" />
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-900 mb-1 tracking-tight">{user.name}</h1>
-          <p className="text-slate-500 text-sm font-medium">{card.card_name}</p>
-          {/* Note: Interaksi count removed as requested */}
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight font-display">{user.name}</h1>
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{card.card_name}</p>
         </div>
 
-        {/* Links List */}
+        {/* Dynamic Links Stack */}
         {links.length > 0 ? (
-          <div className="space-y-3 mb-5">
+          <div className="space-y-3 mb-4">
             {links.map((link) => (
               <a
                 key={link.id}
@@ -92,24 +96,24 @@ export default function ProfilePage({
                 onClick={() => handleLinkClick(link.id)}
                 id={`link-${link.id}`}
                 className="flex items-center gap-3.5 px-5 py-4 rounded-2xl bg-white border border-slate-200/90
-                  hover:border-blue-300 hover:bg-blue-50/50 active:scale-98 shadow-xs
+                  hover:border-blue-300 hover:bg-blue-50/40 active:scale-[0.98] shadow-xs
                   transition-all duration-200 group"
               >
                 <span className="text-xl shrink-0">
                   {LINK_ICONS[link.icon_type] ?? '🔗'}
                 </span>
-                <span className="text-slate-800 font-semibold text-sm flex-1">{link.title}</span>
+                <span className="text-slate-800 font-bold text-sm flex-1">{link.title}</span>
                 <ExternalLink size={15} className="text-slate-400 group-hover:text-ony-blue transition-colors shrink-0" />
               </a>
             ))}
           </div>
         ) : (
-          <div className="card-surface text-center py-8 text-slate-500 text-sm mb-5 bg-white border border-slate-200">
+          <div className="card-surface text-center py-8 text-slate-500 text-sm mb-4 bg-white border border-slate-200 rounded-2xl">
             Belum ada link yang ditambahkan.
           </div>
         )}
 
-        {/* vCard Download */}
+        {/* vCard Save Contact CTA */}
         <button
           onClick={() => {
             const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${user.name}\nEMAIL:${user.email}\nNOTE:Profil Ony NFC & QR\nEND:VCARD`
@@ -120,14 +124,14 @@ export default function ProfilePage({
             URL.revokeObjectURL(url)
           }}
           id="vcard-download-btn"
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-blue-300 transition-all text-sm font-semibold shadow-xs mb-8"
+          className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-800 hover:text-ony-blue hover:border-blue-300 transition-all text-sm font-bold shadow-xs active:scale-[0.98] mb-6"
         >
           <Download size={16} className="text-ony-blue" />
-          Simpan Kontak
+          Simpan Kontak (vCard)
         </button>
 
-        {/* Footer Ony Branding */}
-        <div className="text-center pt-4 border-t border-slate-200/80">
+        {/* Ony Branding Footer */}
+        <div className="text-center pt-2">
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold shadow-xs transition-colors"

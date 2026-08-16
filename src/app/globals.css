@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -18,7 +18,7 @@
   --text: #0F172A;
   --text-muted: #64748B;
 
-  /* Shadcn UI Variables (Tailwind HSL mapped for Ony light mode) */
+  /* Shadcn UI Variables */
   --background: 210 40% 98%;      /* #F8FAFC */
   --foreground: 222.2 84% 4.9%;    /* #020817 */
   
@@ -61,18 +61,22 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+.font-display {
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+}
+
 /* ─── Custom Scrollbar ─────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface-2); }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: #CBD5E1;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--ony-blue); }
@@ -80,28 +84,28 @@ body {
 /* ─── Utility Classes ───────────────────────────────────── */
 @layer utilities {
   .ony-gradient {
-    background: linear-gradient(135deg, #00D9FF, #087CFF);
+    background: linear-gradient(135deg, #00D9FF 0%, #087CFF 100%);
   }
   .ony-gradient-text {
-    background: linear-gradient(135deg, #0284C7, #087CFF);
+    background: linear-gradient(135deg, #0284C7 0%, #087CFF 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .glass {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
-  }
-  .glass-card {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.82);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(226, 232, 240, 0.9);
-    border-radius: 16px;
-    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.04);
   }
   .glow-cyan {
     box-shadow: 0 0 24px rgba(0, 217, 255, 0.2);
@@ -116,31 +120,31 @@ body {
   .btn-primary {
     @apply px-6 py-3 rounded-full font-semibold text-white text-sm
            bg-gradient-to-r from-ony-blue to-blue-600
-           hover:opacity-95 hover:shadow-md active:scale-95 transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-ony-blue/50;
+           hover:opacity-95 hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-ony-blue/40 inline-flex items-center justify-center gap-2;
   }
   .btn-ghost {
     @apply px-6 py-3 rounded-full font-semibold text-sm
            border border-slate-200 text-slate-700 bg-white
-           hover:border-ony-blue/50 hover:text-ony-blue hover:bg-slate-50
-           transition-all duration-200 shadow-sm;
+           hover:border-blue-300 hover:text-ony-blue hover:bg-slate-50/80
+           active:scale-[0.98] transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2;
   }
   .card-surface {
-    @apply bg-white border border-slate-200/90 rounded-xl shadow-sm;
+    @apply bg-white border border-slate-200/90 rounded-2xl shadow-sm hover:shadow transition-all duration-200;
   }
   .input-field {
-    @apply w-full px-4 py-3 rounded-lg bg-white border border-slate-200
+    @apply w-full px-4 py-3 rounded-xl bg-white border border-slate-200
            text-slate-900 placeholder-slate-400 text-sm
            focus:outline-none focus:border-ony-blue focus:ring-2 focus:ring-ony-blue/20
            transition-all duration-200;
   }
   .sidebar-link {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600
-           hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200
+    @apply flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600
+           hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-200
            text-sm font-medium;
   }
   .sidebar-link-active {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg
+    @apply flex items-center gap-3 px-3.5 py-2.5 rounded-xl
            text-ony-blue bg-blue-50/90
            border border-blue-200/80 text-sm font-semibold shadow-sm;
   }
@@ -149,28 +153,28 @@ body {
 /* ─── Animations ────────────────────────────────────────── */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-10px); }
+  50%       { transform: translateY(-8px); }
 }
 @keyframes nfc-wave {
-  0%   { opacity: 0; transform: scale(0.8); }
-  50%  { opacity: 0.6; }
-  100% { opacity: 0; transform: scale(1.8); }
+  0%   { opacity: 0; transform: scale(0.85); }
+  50%  { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(1.65); }
 }
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-float   { animation: float 6s ease-in-out infinite; }
-.animate-fade-up { animation: fade-up 0.6s ease forwards; }
+.animate-float   { animation: float 5s ease-in-out infinite; }
+.animate-fade-up { animation: fade-up 0.5s ease forwards; }
 .nfc-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2px solid rgba(8, 124, 255, 0.4);
-  animation: nfc-wave 2.5s ease-out infinite;
+  border: 2px solid rgba(8, 124, 255, 0.35);
+  animation: nfc-wave 2.8s ease-out infinite;
 }
-.nfc-ring:nth-child(2) { animation-delay: 0.8s; }
-.nfc-ring:nth-child(3) { animation-delay: 1.6s; }
+.nfc-ring:nth-child(2) { animation-delay: 0.9s; }
+.nfc-ring:nth-child(3) { animation-delay: 1.8s; }
 
 @layer base {
   * {

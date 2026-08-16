@@ -56,6 +56,10 @@ const config: Config = {
         'ony-gradient':      'linear-gradient(135deg, #00D9FF, #087CFF)',
         'ony-gradient-dark': 'linear-gradient(135deg, #00D9FF20, #087CFF20)',
       },
+      // ─── Box Shadow ───────────────────────────────────────
+      boxShadow: {
+        xs: '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+      },
       // ─── Radius (keep shadcn var + Ony values) ─────────────
       borderRadius: {
         lg:   'var(--radius)',

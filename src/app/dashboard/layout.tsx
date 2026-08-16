@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   LayoutDashboard, CreditCard, BarChart2, QrCode,
-  ShoppingBag, Settings, LogOut, Menu, X, ChevronRight, ShieldAlert
+  ShoppingBag, Settings, LogOut, Menu, ChevronRight, ShieldAlert
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: '/dashboard',            label: 'Overview',   icon: LayoutDashboard },
   { href: '/dashboard/cards',      label: 'My Media',   icon: CreditCard },
   { href: '/dashboard/analytics',  label: 'Analytics',  icon: BarChart2 },
+  { href: '/dashboard/qr-studio',  label: 'QR Studio',  icon: QrCode },
   { href: '/dashboard/store',      label: 'Store',      icon: ShoppingBag },
   { href: '/dashboard/settings',   label: 'Settings',   icon: Settings },
 ]
@@ -28,11 +29,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
         <div className="card-surface p-8 max-w-md w-full border-rose-200 shadow-xl relative overflow-hidden bg-white">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 via-amber-500 to-rose-500" />
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-amber-500 to-rose-500" />
           <div className="w-16 h-16 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShieldAlert className="text-rose-600" size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Akun Ditangguhkan</h2>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2 font-display">Akun Ditangguhkan</h2>
           <p className="text-slate-600 text-sm mb-6 leading-relaxed">
             Akun Anda (<span className="text-slate-900 font-medium">{user.email}</span>) telah ditangguhkan oleh Administrator. Seluruh fitur dashboard dan akses kartu dinonaktifkan sementara.
           </p>
@@ -63,15 +64,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const Sidebar = () => (
     <aside className="flex flex-col h-full bg-white">
-      {/* Logo */}
+      {/* Brand Header */}
       <div className="p-5 border-b border-slate-200/80">
         <Link href="/" className="flex items-center">
-          <Image src="/logo.png" alt="Ony" width={150} height={44} className="h-10 w-auto rounded object-contain" priority />
+          <Image src="/logo.png" alt="Ony" width={140} height={42} className="h-9 w-auto rounded object-contain" priority />
         </Link>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 p-4 space-y-1">
+      {/* Nav List */}
+      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
@@ -82,41 +83,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className={active ? 'sidebar-link-active' : 'sidebar-link'}
             >
               <Icon size={18} />
-              {label}
+              <span className="font-semibold">{label}</span>
               {active && <ChevronRight size={14} className="ml-auto opacity-60" />}
             </Link>
           )
         })}
 
         {user?.role === 'admin' || user?.role === 'superadmin' ? (
-          <Link href="/admin" className="sidebar-link mt-4 border-t border-slate-200 pt-4 text-amber-700 hover:text-amber-800 hover:bg-amber-50">
+          <Link href="/admin" className="sidebar-link mt-4 border-t border-slate-200/80 pt-4 text-amber-700 hover:text-amber-800 hover:bg-amber-50/80">
             <LayoutDashboard size={18} className="text-amber-600" />
-            <span className="text-amber-700 font-semibold">Admin Panel</span>
+            <span className="text-amber-700 font-bold">Admin Panel</span>
           </Link>
         ) : null}
       </nav>
 
-      {/* User profile */}
-      <div className="p-4 border-t border-slate-200">
+      {/* User Profile Card */}
+      <div className="p-4 border-t border-slate-200/80 bg-slate-50/50">
         <div className="flex items-center gap-3 mb-3">
           {user?.image ? (
-            <Image src={user.image} alt={user.name ?? ''} width={36} height={36} className="rounded-full ring-2 ring-slate-200" />
+            <Image src={user.image} alt={user.name ?? ''} width={36} height={36} className="rounded-full ring-2 ring-blue-100 shadow-xs" />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-ony-gradient flex items-center justify-center text-white text-sm font-bold shadow-xs">
+            <div className="w-9 h-9 rounded-full bg-ony-gradient flex items-center justify-center text-white text-xs font-bold shadow-xs font-display">
               {user?.name?.[0] ?? '?'}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-slate-900 text-sm font-semibold truncate">{user?.name}</div>
-            <div className="text-slate-500 text-xs truncate">{user?.email}</div>
+            <div className="text-slate-900 text-xs font-bold truncate">{user?.name}</div>
+            <div className="text-slate-500 text-[11px] truncate">{user?.email}</div>
           </div>
         </div>
         <button
           id="signout-btn"
           onClick={() => signOut({ callbackUrl: '/' })}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 text-sm transition-all font-medium"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-slate-600 hover:text-rose-600 hover:bg-rose-50 text-xs transition-all font-semibold border border-slate-200/80 bg-white shadow-xs"
         >
-          <LogOut size={15} />
+          <LogOut size={14} />
           Sign Out
         </button>
       </div>
@@ -124,36 +125,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex selection:bg-ony-blue selection:text-white">
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200/90 fixed inset-y-0 left-0 z-30 shadow-xs">
         <Sidebar />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay Drawer */}
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="flex flex-col w-64 bg-white border-r border-slate-200">
+        <div className="lg:hidden fixed inset-0 z-50 flex animate-fade-up">
+          <div className="flex flex-col w-64 bg-white border-r border-slate-200 shadow-2xl">
             <Sidebar />
           </div>
-          <div className="flex-1 bg-slate-900/40 backdrop-blur-xs" onClick={() => setSidebarOpen(false)} />
+          <div className="flex-1 bg-slate-950/40 backdrop-blur-xs" onClick={() => setSidebarOpen(false)} />
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Container */}
       <div className="flex-1 lg:ml-64 min-h-screen flex flex-col bg-slate-50">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-20">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-600 hover:text-slate-900 p-1">
+        {/* Mobile Navbar Header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-20">
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-700 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100 transition-colors">
             <Menu size={22} />
           </button>
           <div className="flex items-center">
-            <Image src="/logo.png" alt="Ony" width={130} height={40} className="h-9 w-auto rounded object-contain" priority />
+            <Image src="/logo.png" alt="Ony" width={120} height={36} className="h-8 w-auto rounded object-contain" priority />
           </div>
           <div className="w-8" />
         </header>
 
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto">
           {children}
         </main>
       </div>

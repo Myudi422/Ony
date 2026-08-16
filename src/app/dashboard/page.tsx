@@ -50,58 +50,58 @@ export default function DashboardPage() {
   const safeCards = Array.isArray(cards) ? cards : []
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 tracking-tight font-display">
           Halo, {user?.name?.split(' ')[0] ?? 'Kamu'} 👋
         </h1>
-        <p className="text-slate-600">Kelola kartu NFC & QR digitalmu dari sini.</p>
+        <p className="text-slate-600 text-sm">Kelola kartu NFC & QR digitalmu secara terpusat dari sini.</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="card-surface p-5">
-            <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+          <div key={label} className="card-surface p-4 sm:p-5">
+            <div className={`w-10 h-10 ${bg} rounded-2xl flex items-center justify-center mb-3 shadow-xs`}>
               <Icon size={18} className={color} />
             </div>
-            <div className="text-2xl font-bold text-slate-900 mb-0.5">{formatNumber(value)}</div>
-            <div className="text-slate-500 text-xs font-medium">{label}</div>
+            <div className="text-2xl font-extrabold text-slate-900 mb-0.5 font-display">{formatNumber(value)}</div>
+            <div className="text-slate-500 text-xs font-semibold">{label}</div>
           </div>
         ))}
       </div>
 
       {/* Media Cards */}
-      <div className="mb-6">
+      <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Media Aktif</h2>
-          <Link href="/dashboard/cards" className="text-ony-blue text-sm font-semibold hover:underline flex items-center gap-1">
+          <h2 className="text-lg font-bold text-slate-900 font-display">Media Aktif</h2>
+          <Link href="/dashboard/cards" className="text-ony-blue text-xs sm:text-sm font-semibold hover:underline flex items-center gap-1">
             Kelola semua <ArrowRight size={14} />
           </Link>
         </div>
 
         {safeCards.length === 0 ? (
-          <div className="card-surface p-8 text-center">
+          <div className="card-surface p-8 text-center bg-white border border-slate-200">
             <CreditCard size={40} className="text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-700 font-medium mb-1">Belum ada kartu terhubung</p>
-            <p className="text-slate-500 text-sm">Tap kartu NFC atau scan QR untuk mengklaim media pertamamu.</p>
+            <p className="text-slate-700 font-bold text-sm mb-1 font-display">Belum ada kartu terhubung</p>
+            <p className="text-slate-500 text-xs">Tap kartu NFC atau scan QR untuk mengklaim media pertamamu.</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {safeCards.slice(0, 3).map((card) => (
-              <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-5 hover:border-blue-300 transition-all group shadow-xs">
+              <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-5 hover:border-blue-300 transition-all group shadow-xs bg-white">
                 <div className="flex items-start justify-between mb-3">
                   <span className="text-2xl">{MEDIA_ICONS[card.media_type] ?? '📱'}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
                     card.status === 'active' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-200'
                   }`}>
                     {card.status}
                   </span>
                 </div>
-                <div className="text-slate-900 font-semibold text-sm mb-1 group-hover:text-ony-blue transition-colors">{card.card_name}</div>
-                <div className="flex items-center gap-1 text-slate-500 text-xs">
-                  <Wifi size={10} />
+                <div className="text-slate-900 font-bold text-sm mb-1 group-hover:text-ony-blue transition-colors font-display">{card.card_name}</div>
+                <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold">
+                  <Wifi size={12} className="text-ony-blue" />
                   {formatNumber(card.total_taps)} interaksi
                 </div>
               </Link>
@@ -112,18 +112,18 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Aksi Cepat</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <h2 className="text-lg font-bold text-slate-900 mb-4 font-display">Aksi Cepat</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { href: '/dashboard/cards',     icon: CreditCard, label: 'Edit Profil',    bg: 'bg-blue-50/60 hover:bg-blue-100/70 border-blue-200/60' },
-            { href: '/dashboard/analytics', icon: BarChart2,  label: 'Lihat Analytics', bg: 'bg-purple-50/60 hover:bg-purple-100/70 border-purple-200/60' },
-            { href: '/dashboard/qr-studio', icon: QrCode,     label: 'QR Studio',       bg: 'bg-emerald-50/60 hover:bg-emerald-100/70 border-emerald-200/60' },
-            { href: '/dashboard/store',     icon: Wifi,       label: 'Beli Media',      bg: 'bg-amber-50/60 hover:bg-amber-100/70 border-amber-200/60' },
+            { href: '/dashboard/cards',     icon: CreditCard, label: 'Edit Profil',    bg: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80' },
+            { href: '/dashboard/analytics', icon: BarChart2,  label: 'Lihat Analytics', bg: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80' },
+            { href: '/dashboard/qr-studio', icon: QrCode,     label: 'QR Studio',       bg: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80' },
+            { href: '/dashboard/store',     icon: Wifi,       label: 'Beli Media',      bg: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80' },
           ].map(({ href, icon: Icon, label, bg }) => (
             <Link key={href} href={href}
-              className={`p-4 flex flex-col items-center gap-2 text-center rounded-xl border transition-all hover:-translate-y-0.5 shadow-xs ${bg}`}>
+              className={`p-4 flex flex-col items-center gap-2.5 text-center rounded-2xl border transition-all hover:-translate-y-0.5 shadow-xs ${bg}`}>
               <Icon size={20} className="text-ony-blue" />
-              <span className="text-slate-800 text-xs font-semibold">{label}</span>
+              <span className="text-slate-800 text-xs font-bold">{label}</span>
             </Link>
           ))}
         </div>
