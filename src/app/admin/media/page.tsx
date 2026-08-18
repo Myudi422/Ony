@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Plus, Download, RefreshCw, Unlink, QrCode, Copy, Check,
   ExternalLink, Eye, X, Trash2, Search, Filter, Calendar, RotateCcw,
-  CreditCard, Tag, ShieldAlert, Palette
+  CreditCard, Tag, ShieldAlert, Palette, FileText, CheckCircle2, Loader2
 } from 'lucide-react'
 import { formatDate, MEDIA_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -23,11 +23,21 @@ interface Card {
   users?: { name: string; email: string } | null
 }
 
+interface Stats {
+  total: number
+  unclaimed: number
+  active: number
+  suspended: number
+  unpaid: number
+}
+
 export default function AdminMediaPage() {
   const [cards, setCards] = useState<Card[]>([])
   const [total, setTotal] = useState(0)
+  const [stats, setStats] = useState<Stats>({ total: 0, unclaimed: 0, active: 0, suspended: 0, unpaid: 0 })
   const [page, setPage] = useState(1)
   const [limit] = useState(20)
+  const [loading, setLoading] = useState(false)
 
   // Filters State
   const [search, setSearch] = useState('')
@@ -42,6 +52,9 @@ export default function AdminMediaPage() {
   const [generating, setGenerating] = useState(false)
   const [newCards, setNewCards] = useState<Card[]>([])
 
+  // Toast / Notification state
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
+
   // Action & Modal State
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [previewCard, setPreviewCard] = useState<Card | null>(null)
@@ -54,12 +67,18 @@ export default function AdminMediaPage() {
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
 
+  const showToast = (msg: string) => {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(null), 3000)
+  }
+
   const load = useCallback(async () => {
+    setLoading(true)
     try {
       const queryParams = new URLSearchParams({
         page: String(page),
         limit: String(limit),
-        search,
+        search: search.trim(),
         payment_status: filterPayment,
         status: filterStatus,
         start_date: startDate,
@@ -69,7 +88,9 @@ export default function AdminMediaPage() {
       const d = await res.json()
       setCards(d.cards ?? [])
       setTotal(d.total ?? 0)
+      if (d.stats) setStats(d.stats)
     } catch (_) {}
+    setLoading(false)
   }, [page, limit, search, filterPayment, filterStatus, startDate, endDate])
 
   useEffect(() => { load() }, [load])
@@ -80,6 +101,26 @@ export default function AdminMediaPage() {
     setFilterStatus('all')
     setStartDate('')
     setEndDate('')
+    setPage(1)
+  }
+
+  const setQuickDatePreset = (preset: 'today' | '7days' | 'month') => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    if (preset === 'today') {
+      setStartDate(todayStr)
+      setEndDate(todayStr)
+    } else if (preset === '7days') {
+      const past7 = new Date()
+      past7.setDate(past7.getDate() - 7)
+      setStartDate(past7.toISOString().split('T')[0])
+      setEndDate(todayStr)
+    } else if (preset === 'month') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+      setStartDate(firstDay.toISOString().split('T')[0])
+      setEndDate(todayStr)
+    }
     setPage(1)
   }
 
@@ -94,6 +135,7 @@ export default function AdminMediaPage() {
       const data = await res.json()
       if (res.ok && data.cards) {
         setNewCards(data.cards)
+        showToast(`✨ Berhasil generate ${data.cards.length} media NFC + QR baru!`)
         load()
       } else {
         alert(`Gagal generate media: ${data.error || 'Terjadi kesalahan'}`)
@@ -128,6 +170,7 @@ export default function AdminMediaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardIds: selectedIds }),
       })
+      showToast(`Terhapus ${selectedIds.length} media terpilih.`)
       setSelectedIds([])
       load()
     } catch (_) {}
@@ -138,6 +181,35 @@ export default function AdminMediaPage() {
     navigator.clipboard.writeText(text)
     setCopiedCode(code)
     setTimeout(() => setCopiedCode(null), 2000)
+  }
+
+  // BULK COPY FUNCTIONS
+  const selectedCards = cards.filter(c => selectedIds.includes(c.id))
+
+  const bulkCopyLinks = (targetList: Card[] = selectedCards) => {
+    if (targetList.length === 0) return
+    const links = targetList.map(c => `${baseUrl}/c/${c.activation_code}`).join('\n')
+    navigator.clipboard.writeText(links)
+    showToast(`📋 ${targetList.length} URL NFC disalin ke clipboard!`)
+  }
+
+  const bulkCopyCodes = (targetList: Card[] = selectedCards) => {
+    if (targetList.length === 0) return
+    const codes = targetList.map(c => c.activation_code).join('\n')
+    navigator.clipboard.writeText(codes)
+    showToast(`📟 ${targetList.length} Kode Aktivasi disalin ke clipboard!`)
+  }
+
+  const bulkCopyCSV = (targetList: Card[] = selectedCards) => {
+    if (targetList.length === 0) return
+    const rows = ['Code,NFC_URL,Status,Payment_Option', ...targetList.map(c => {
+      const link = `${baseUrl}/c/${c.activation_code}`
+      const isUnpaid = c.payment_status === 'unpaid' || c.redirect_url === 'UNPAID'
+      const payOption = isUnpaid ? 'Blangko (Unpaid)' : 'Pre-Paid'
+      return `${c.activation_code},${link},${c.status},${payOption}`
+    })]
+    navigator.clipboard.writeText(rows.join('\n'))
+    showToast(`📄 Data CSV (${targetList.length} item) disalin ke clipboard!`)
   }
 
   const getLogoBase64 = async (): Promise<string> => {
@@ -243,6 +315,7 @@ export default function AdminMediaPage() {
       if (data.error) {
         alert(`Gagal unbind: ${data.error}`)
       } else {
+        showToast('Kartu berhasil di-unbind.')
         load()
       }
     } catch (err: any) {
@@ -256,6 +329,7 @@ export default function AdminMediaPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cardId, action: 'status', value: status }),
     })
+    showToast(`Status kartu diperbarui ke ${status}.`)
     load()
   }
 
@@ -277,16 +351,24 @@ export default function AdminMediaPage() {
   const hasActiveFilters = search || filterPayment !== 'all' || filterStatus !== 'all' || startDate || endDate
 
   return (
-    <div className="max-w-7xl w-full mx-auto space-y-5 sm:space-y-6 min-w-0">
+    <div className="max-w-7xl w-full mx-auto space-y-5 sm:space-y-6 min-w-0 relative">
+      {/* Toast Floating Alert */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-3 animate-slide-up">
+          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{toastMsg}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 font-display">Media Generator (NFC + QR)</h1>
-          <p className="text-slate-600 text-xs sm:text-sm">Kelola seluruh media fisik NFC, cetak QR Code, dan filter status pembayaran.</p>
+          <p className="text-slate-600 text-xs sm:text-sm">Kelola seluruh media fisik NFC, copy link NFC masal, cetak QR Code, & filter presisi.</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button onClick={load} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-xs transition-all" title="Reload Data">
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className={cn(loading && 'animate-spin')} />
           </button>
           <button onClick={exportCSV} className="btn-primary text-xs py-2.5 px-3.5 sm:px-4 flex items-center gap-2 shadow-sm font-semibold">
             <Download size={14} />
@@ -299,7 +381,7 @@ export default function AdminMediaPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Batch Generator */}
         <div className="card-surface p-6 bg-white border border-slate-200/90 rounded-2xl shadow-sm">
-          <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 font-display">
             <Plus size={18} className="text-ony-blue" />
             Generate Batch NFC + QR
           </h2>
@@ -349,17 +431,17 @@ export default function AdminMediaPage() {
         {/* Status Breakdown & Quick Stats */}
         <div className="card-surface p-6 bg-white border border-slate-200/90 rounded-2xl shadow-sm lg:col-span-2 flex flex-col justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
-              <span>Ringkasan Ekosistem Media</span>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">Total: {total}</span>
+            <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center justify-between font-display">
+              <span>Ringkasan Ekosistem Media (Seluruh DB)</span>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">Total: {stats.total || total}</span>
             </h2>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               {[
-                { label: 'Unclaimed', color: 'text-amber-700 bg-amber-50 border-amber-200', count: cards.filter(c => c.status === 'unclaimed').length },
-                { label: 'Active', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', count: cards.filter(c => c.status === 'active').length },
-                { label: 'Suspended', color: 'text-rose-700 bg-rose-50 border-rose-200', count: cards.filter(c => c.status === 'suspended').length },
-                { label: 'Blangko (Unpaid)', color: 'text-purple-700 bg-purple-50 border-purple-200', count: cards.filter(c => c.payment_status === 'unpaid' || c.redirect_url === 'UNPAID').length },
+                { label: 'Unclaimed', color: 'text-amber-700 bg-amber-50 border-amber-200', count: stats.unclaimed },
+                { label: 'Active', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', count: stats.active },
+                { label: 'Suspended', color: 'text-rose-700 bg-rose-50 border-rose-200', count: stats.suspended },
+                { label: 'Blangko (Unpaid)', color: 'text-purple-700 bg-purple-50 border-purple-200', count: stats.unpaid },
               ].map(st => (
                 <div key={st.label} className={cn('p-3 rounded-xl border flex flex-col justify-between', st.color)}>
                   <div className="text-[11px] font-semibold tracking-tight">{st.label}</div>
@@ -370,8 +452,8 @@ export default function AdminMediaPage() {
           </div>
 
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center justify-between">
-            <span>Daftar media memuat {cards.length} dari {total} total item di database.</span>
-            <span className="font-semibold text-slate-900">Page {page}</span>
+            <span>Menampilkan {cards.length} media (Halaman {page}) dari {total} item filter.</span>
+            <span className="font-semibold text-slate-900">Total System: {stats.total || total} Media</span>
           </div>
         </div>
       </div>
@@ -379,16 +461,32 @@ export default function AdminMediaPage() {
       {/* Generated Cards Gallery (If newly generated) */}
       {newCards.length > 0 && (
         <div className="p-6 rounded-2xl bg-blue-50/90 border border-blue-200/90 shadow-sm animate-fade-in space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-blue-200/60 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 font-display">
                 <span>✨</span> Hasil Generate ({newCards.length} Media NFC + QR Baru)
               </h2>
               <p className="text-slate-600 text-xs">Siap di-encode ke Chip NFC dan dicetak QR Code-nya</p>
             </div>
-            <button onClick={() => setNewCards([])} className="text-slate-400 hover:text-slate-700 p-1">
-              <X size={18} />
-            </button>
+            
+            {/* Bulk Actions for Batch Generation */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => bulkCopyLinks(newCards)}
+                className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 font-semibold shadow-xs"
+              >
+                <Copy size={13} /> Salin Semua Link ({newCards.length})
+              </button>
+              <button
+                onClick={() => bulkCopyCodes(newCards)}
+                className="btn-ghost bg-white hover:bg-slate-50 text-slate-800 text-xs py-1.5 px-3 border border-slate-200 flex items-center gap-1.5 font-semibold"
+              >
+                <Tag size={13} /> Salin Kode ({newCards.length})
+              </button>
+              <button onClick={() => setNewCards([])} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-blue-100/50 transition-colors ml-1">
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -472,10 +570,10 @@ export default function AdminMediaPage() {
         </div>
       )}
 
-      {/* FILTER CONTROL BAR */}
-      <div className="card-surface p-5 bg-white border border-slate-200/90 rounded-2xl shadow-sm space-y-4">
+      {/* FILTER CONTROL BAR - Compact & Fitted Layout */}
+      <div className="card-surface p-4 sm:p-5 bg-white border border-slate-200/90 rounded-2xl shadow-sm space-y-3.5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+          <div className="flex items-center gap-2 text-slate-900 font-bold text-sm font-display">
             <Filter size={16} className="text-ony-blue" />
             Filter & Pencarian Media
           </div>
@@ -489,20 +587,29 @@ export default function AdminMediaPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Search */}
-          <div className="relative lg:col-span-2">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Compact Inline Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative w-full sm:w-60">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              className="input-field pl-9 w-full text-xs font-medium"
+              className="input-field pl-9 pr-8 w-full text-xs font-medium"
               placeholder="Cari kode aktivasi..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
             />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); setPage(1) }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
           {/* Payment Option Filter */}
-          <div>
+          <div className="w-full sm:w-44">
             <select
               value={filterPayment}
               onChange={e => { setFilterPayment(e.target.value); setPage(1) }}
@@ -515,7 +622,7 @@ export default function AdminMediaPage() {
           </div>
 
           {/* Status Aktivasi Filter */}
-          <div>
+          <div className="w-full sm:w-36">
             <select
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); setPage(1) }}
@@ -529,53 +636,161 @@ export default function AdminMediaPage() {
             </select>
           </div>
 
-          {/* Date Filter Start */}
-          <div className="relative">
+          {/* Date Filter Inputs (Start & End) */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
             <input
               type="date"
               value={startDate}
               onChange={e => { setStartDate(e.target.value); setPage(1) }}
-              className="input-field text-xs font-medium text-slate-800"
+              className="input-field w-32 text-[11px] px-2 font-medium text-slate-800"
               title="Tanggal pembuatan dari"
+            />
+            <span className="text-slate-400 text-xs font-bold">-</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => { setEndDate(e.target.value); setPage(1) }}
+              className="input-field w-32 text-[11px] px-2 font-medium text-slate-800"
+              title="Tanggal pembuatan sampai"
             />
           </div>
         </div>
 
-        {/* Filter Badges Active Indicator */}
-        {hasActiveFilters && (
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs flex-wrap">
-            <span className="text-slate-400 font-medium">Filter Aktif:</span>
-            {search && <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-ony-blue border border-blue-200 font-medium">Search: &quot;{search}&quot;</span>}
-            {filterPayment !== 'all' && <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-medium">Payment: {filterPayment}</span>}
-            {filterStatus !== 'all' && <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">Status: {filterStatus}</span>}
-            {startDate && <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">Dari: {startDate}</span>}
-            {endDate && <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">Sampai: {endDate}</span>}
+        {/* Quick Date Presets & Filter Active Badges */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 text-[11px] font-semibold flex items-center gap-1">
+              <Calendar size={12} /> Preset Tanggal:
+            </span>
+            {[
+              { label: 'Hari Ini', preset: 'today' },
+              { label: '7 Hari', preset: '7days' },
+              { label: 'Bulan Ini', preset: 'month' },
+            ].map(p => (
+              <button
+                key={p.preset}
+                onClick={() => setQuickDatePreset(p.preset as any)}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-        )}
+
+          {/* Active Filter Badges */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-1.5 text-xs flex-wrap">
+              <span className="text-slate-400 text-[11px] font-medium">Aktif:</span>
+              {search && (
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-ony-blue border border-blue-200 text-[11px] font-medium flex items-center gap-1">
+                  &quot;{search}&quot;
+                  <X size={12} className="cursor-pointer hover:text-blue-800" onClick={() => { setSearch(''); setPage(1) }} />
+                </span>
+              )}
+              {filterPayment !== 'all' && (
+                <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-medium flex items-center gap-1">
+                  Payment: {filterPayment}
+                  <X size={12} className="cursor-pointer hover:text-purple-900" onClick={() => { setFilterPayment('all'); setPage(1) }} />
+                </span>
+              )}
+              {filterStatus !== 'all' && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium flex items-center gap-1">
+                  Status: {filterStatus}
+                  <X size={12} className="cursor-pointer hover:text-amber-900" onClick={() => { setFilterStatus('all'); setPage(1) }} />
+                </span>
+              )}
+              {startDate && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium flex items-center gap-1">
+                  Dari: {startDate}
+                  <X size={12} className="cursor-pointer hover:text-slate-900" onClick={() => { setStartDate(''); setPage(1) }} />
+                </span>
+              )}
+              {endDate && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium flex items-center gap-1">
+                  Sampai: {endDate}
+                  <X size={12} className="cursor-pointer hover:text-slate-900" onClick={() => { setEndDate(''); setPage(1) }} />
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Selected Action Bar */}
+      {/* SELECTED BULK ACTIONS TOOLBAR */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between bg-rose-50 border border-rose-200 p-4 rounded-2xl animate-fade-in shadow-xs">
-          <div className="text-rose-800 text-xs font-bold flex items-center gap-2">
-            <ShieldAlert size={16} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-900 text-white p-4 rounded-2xl animate-fade-in shadow-xl gap-3 border border-slate-800">
+          <div className="text-xs font-bold flex items-center gap-2.5">
+            <ShieldAlert size={16} className="text-amber-400" />
             <span>{selectedIds.length} media dipilih</span>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold transition-all flex items-center gap-1"
+              title="Batalkan pilihan kartu"
+            >
+              <X size={12} /> Batal Pilih
+            </button>
           </div>
-          <button
-            onClick={deleteSelected}
-            disabled={deleting}
-            className="flex items-center gap-1.5 text-xs text-white bg-rose-600 hover:bg-rose-700 px-4 py-2 rounded-xl transition-all shadow-sm font-semibold disabled:opacity-50"
-          >
-            <Trash2 size={14} /> Hapus {selectedIds.length} Media Terpilih
-          </button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => bulkCopyLinks()}
+              className="flex items-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-2 rounded-xl transition-all shadow-sm font-semibold"
+              title="Salin semua URL NFC ke clipboard"
+            >
+              <Copy size={13} /> Salin {selectedIds.length} Link NFC
+            </button>
+            <button
+              onClick={() => bulkCopyCodes()}
+              className="flex items-center gap-1.5 text-xs text-slate-900 bg-emerald-400 hover:bg-emerald-300 px-3.5 py-2 rounded-xl transition-all shadow-sm font-bold"
+              title="Salin kode aktivasi NFC"
+            >
+              <Tag size={13} /> Salin {selectedIds.length} Kode
+            </button>
+            <button
+              onClick={() => bulkCopyCSV()}
+              className="flex items-center gap-1.5 text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-2 rounded-xl transition-all font-semibold"
+              title="Salin format CSV untuk printer NFC"
+            >
+              <FileText size={13} /> Salin CSV
+            </button>
+            <button
+              onClick={deleteSelected}
+              disabled={deleting}
+              className="flex items-center gap-1.5 text-xs text-white bg-rose-600 hover:bg-rose-700 px-3.5 py-2 rounded-xl transition-all shadow-sm font-semibold disabled:opacity-50 ml-auto sm:ml-0"
+            >
+              <Trash2 size={13} /> Hapus
+            </button>
+          </div>
         </div>
       )}
 
       {/* CARDS LIST TABLE */}
-      <div className="card-surface overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm min-w-0 w-full">
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-slate-50/50">
-          <h3 className="font-bold text-slate-900 text-sm font-display">Daftar Seluruh Media NFC & QR</h3>
-          <span className="text-slate-500 text-xs font-mono">Menampilkan {cards.length} dari {total} Media</span>
+      <div className="card-surface overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm min-w-0 w-full relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center">
+            <div className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl shadow-lg text-xs font-semibold">
+              <Loader2 size={16} className="animate-spin text-blue-400" />
+              Memuat media...
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-slate-900 text-sm font-display">Daftar Seluruh Media NFC & QR</h3>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-ony-blue font-semibold border border-blue-200">
+              {cards.length} dari {total} Media
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              onClick={() => selectedIds.length > 0 ? setSelectedIds([]) : toggleSelectAll()}
+              className="btn-ghost py-1 px-2.5 text-xs border border-slate-200 font-medium"
+            >
+              {selectedIds.length > 0 ? `Batal Pilih (${selectedIds.length})` : 'Pilih Semua (Halaman Ini)'}
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto min-w-0 w-full">
@@ -609,7 +824,7 @@ export default function AdminMediaPage() {
                       <p className="font-semibold text-slate-700 text-sm">Tidak ada media ditemukan</p>
                       <p className="text-slate-400 text-xs">Coba ubah kata kunci pencarian atau reset filter di atas.</p>
                       {hasActiveFilters && (
-                        <button onClick={resetFilters} className="btn-ghost text-xs py-1.5 px-3 border border-slate-200 mt-2">
+                        <button onClick={resetFilters} className="btn-ghost text-xs py-1.5 px-3 border border-slate-200 mt-2 font-medium">
                           Reset Filter
                         </button>
                       )}
@@ -620,6 +835,7 @@ export default function AdminMediaPage() {
                 const nfcUrl = `${baseUrl}/c/${card.activation_code}`
                 const isSelected = selectedIds.includes(card.id)
                 const isUnpaid = card.payment_status === 'unpaid' || card.redirect_url === 'UNPAID'
+                const isCopied = copiedCode === card.activation_code
 
                 return (
                   <tr key={card.id} className={cn('hover:bg-slate-50/80 transition-colors', isSelected && 'bg-blue-50/40')}>
@@ -638,7 +854,7 @@ export default function AdminMediaPage() {
                       <button
                         onClick={() => setPreviewCard(card)}
                         className="p-1 bg-white rounded-lg hover:scale-105 transition-transform border border-slate-200 shadow-2xs"
-                        title="Perbesar QR"
+                        title="Perbesar & Kustomisasi QR"
                       >
                         <QRCodeSVG
                           value={nfcUrl}
@@ -698,6 +914,14 @@ export default function AdminMediaPage() {
                     {/* Actions */}
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => copyToClipboard(nfcUrl, card.activation_code)}
+                          className="flex items-center gap-1 text-[11px] text-slate-700 border border-slate-200 hover:bg-slate-100 px-2.5 py-1 rounded-lg transition-all font-medium"
+                          title="Salin URL Link NFC"
+                        >
+                          {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          {isCopied ? 'Tersalin' : 'Link'}
+                        </button>
                         <button
                           onClick={() => setPreviewCard(card)}
                           className="flex items-center gap-1 text-[11px] text-ony-blue border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-all font-medium"

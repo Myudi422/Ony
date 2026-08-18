@@ -29,14 +29,15 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin.from('cards').select('*, users(name, email)', { count: 'exact' })
 
-  if (search) {
-    query = query.or(`activation_code.ilike.%${search}%,card_name.ilike.%${search}%`)
+  const cleanSearch = search.trim()
+  if (cleanSearch) {
+    query = query.or(`activation_code.ilike.%${cleanSearch}%,card_name.ilike.%${cleanSearch}%`)
   }
 
   if (paymentStatus === 'paid') {
-    query = query.or('payment_status.eq.paid,redirect_url.neq.UNPAID')
+    query = query.or('redirect_url.is.null,redirect_url.neq.UNPAID')
   } else if (paymentStatus === 'unpaid') {
-    query = query.or('payment_status.eq.unpaid,redirect_url.eq.UNPAID')
+    query = query.eq('redirect_url', 'UNPAID')
   }
 
   if (cardStatus !== 'all') {
@@ -54,10 +55,25 @@ export async function GET(req: NextRequest) {
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  const { data, count, error } = await query.range(from, to).order('created_at', { ascending: false })
+  const [{ data, count, error }, unclaimedRes, activeRes, suspendedRes, unpaidRes] = await Promise.all([
+    query.range(from, to).order('created_at', { ascending: false }),
+    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'unclaimed'),
+    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'suspended'),
+    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('redirect_url', 'UNPAID'),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ cards: data ?? [], total: count ?? 0, page, limit })
+
+  const stats = {
+    total: count ?? 0,
+    unclaimed: unclaimedRes.count ?? 0,
+    active: activeRes.count ?? 0,
+    suspended: suspendedRes.count ?? 0,
+    unpaid: unpaidRes.count ?? 0,
+  }
+
+  return NextResponse.json({ cards: data ?? [], total: count ?? 0, stats, page, limit })
 }
 
 export async function POST(req: NextRequest) {
