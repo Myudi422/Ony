@@ -69,14 +69,16 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      if (url.startsWith('/')) return `${baseUrl}${url}`
+      // Always return relative path so NextAuth stays on whatever domain the user is visiting (e.g. ony.my.id)
+      if (url.startsWith('/')) return url
+
       try {
         const u = new URL(url)
-        if (u.origin === baseUrl) return url
-        // Normalize cross-domain URLs to current host baseUrl (e.g. ony-nfc.vercel.app -> ony.my.id)
-        if (u.pathname) return `${baseUrl}${u.pathname}${u.search}`
+        // If same origin, return relative pathname + search to avoid domain mismatch
+        if (u.pathname) return `${u.pathname}${u.search}`
       } catch (_) {}
-      return baseUrl
+
+      return '/dashboard'
     },
     async signIn({ user }) {
       if (!user.email) return false

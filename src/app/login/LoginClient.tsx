@@ -1,7 +1,7 @@
 'use client'
 
 import { signIn, useSession } from 'next-auth/react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
@@ -11,19 +11,19 @@ import { loginWithGoogleFirebase } from '@/lib/firebase'
 function LoginForm() {
   const { data: session, status } = useSession()
   const params = useSearchParams()
-  const router = useRouter()
 
   const rawCallback = params.get('callbackUrl')
   let claimCode = params.get('claim') || params.get('autoClaim')
 
-  // Safely extract relative path and claim code even if absolute URL (e.g. https://ony-nfc.vercel.app/c/...) is passed
-  let sanitizedCallback = '/dashboard'
+  // Always force callbackUrl to be a relative path (e.g. /dashboard or /c/CODE?autoClaim=CODE)
+  // to avoid cross-domain cookie loss between ony.my.id and ony-nfc.vercel.app
+  let relativeCallback = '/dashboard'
 
   if (rawCallback) {
     try {
       if (rawCallback.startsWith('http://') || rawCallback.startsWith('https://')) {
         const u = new URL(rawCallback)
-        sanitizedCallback = u.pathname + u.search
+        relativeCallback = u.pathname + u.search
         const matchCode = u.pathname.match(/\/c\/([A-Za-z0-9_-]+)/)
         if (matchCode && !claimCode) {
           claimCode = matchCode[1]
@@ -33,25 +33,25 @@ function LoginForm() {
           claimCode = autoClaimInUrl
         }
       } else {
-        sanitizedCallback = rawCallback
+        relativeCallback = rawCallback
         const matchCode = rawCallback.match(/\/c\/([A-Za-z0-9_-]+)/)
         if (matchCode && !claimCode) {
           claimCode = matchCode[1]
         }
       }
     } catch (_) {
-      sanitizedCallback = rawCallback
+      relativeCallback = rawCallback.startsWith('/') ? rawCallback : '/dashboard'
     }
   } else if (claimCode) {
-    sanitizedCallback = `/c/${claimCode}?autoClaim=${claimCode}`
+    relativeCallback = `/c/${claimCode}?autoClaim=${claimCode}`
   }
 
-  const callbackUrl = sanitizedCallback
+  const callbackUrl = relativeCallback
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // Handle already authenticated state
+  // Handle already authenticated state — perform claim if code exists then do hard navigation
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       if (claimCode) {
@@ -60,13 +60,13 @@ function LoginForm() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: claimCode }),
         }).finally(() => {
-          router.replace(callbackUrl)
+          window.location.href = callbackUrl
         })
       } else {
-        router.replace(callbackUrl)
+        window.location.href = callbackUrl
       }
     }
-  }, [status, session, callbackUrl, claimCode, router])
+  }, [status, session, callbackUrl, claimCode])
 
   const handleGoogleLogin = async () => {
     setLoading(true)
@@ -102,10 +102,11 @@ function LoginForm() {
         } catch (_) {}
       }
 
-      router.push(callbackUrl)
+      // Hard redirect to callbackUrl on current origin (ony.my.id)
+      window.location.href = callbackUrl
     } catch (err: unknown) {
       console.error('Firebase Auth error:', err)
-      // Fallback: if popup fails or is blocked, try NextAuth Google provider directly
+      // Fallback: if popup fails or is blocked, try NextAuth Google provider directly with relative callback
       signIn('google', { callbackUrl })
       setLoading(false)
     }
