@@ -12,17 +12,59 @@ function LoginForm() {
   const { data: session, status } = useSession()
   const params = useSearchParams()
   const router = useRouter()
-  const rawCallback = params.get('callbackUrl')
-  const claimCode = params.get('claim') || params.get('autoClaim')
 
-  const callbackUrl = rawCallback || (claimCode ? `/c/${claimCode}?autoClaim=${claimCode}` : '/dashboard')
+  const rawCallback = params.get('callbackUrl')
+  let claimCode = params.get('claim') || params.get('autoClaim')
+
+  // Safely extract relative path and claim code even if absolute URL (e.g. https://ony-nfc.vercel.app/c/...) is passed
+  let sanitizedCallback = '/dashboard'
+
+  if (rawCallback) {
+    try {
+      if (rawCallback.startsWith('http://') || rawCallback.startsWith('https://')) {
+        const u = new URL(rawCallback)
+        sanitizedCallback = u.pathname + u.search
+        const matchCode = u.pathname.match(/\/c\/([A-Za-z0-9_-]+)/)
+        if (matchCode && !claimCode) {
+          claimCode = matchCode[1]
+        }
+        const autoClaimInUrl = u.searchParams.get('autoClaim') || u.searchParams.get('claim')
+        if (autoClaimInUrl && !claimCode) {
+          claimCode = autoClaimInUrl
+        }
+      } else {
+        sanitizedCallback = rawCallback
+        const matchCode = rawCallback.match(/\/c\/([A-Za-z0-9_-]+)/)
+        if (matchCode && !claimCode) {
+          claimCode = matchCode[1]
+        }
+      }
+    } catch (_) {
+      sanitizedCallback = rawCallback
+    }
+  } else if (claimCode) {
+    sanitizedCallback = `/c/${claimCode}?autoClaim=${claimCode}`
+  }
+
+  const callbackUrl = sanitizedCallback
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Handle already authenticated state
   useEffect(() => {
-    if (status === 'authenticated' && session?.user && !claimCode) {
-      router.replace(callbackUrl)
+    if (status === 'authenticated' && session?.user) {
+      if (claimCode) {
+        fetch('/api/cards/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: claimCode }),
+        }).finally(() => {
+          router.replace(callbackUrl)
+        })
+      } else {
+        router.replace(callbackUrl)
+      }
     }
   }, [status, session, callbackUrl, claimCode, router])
 
@@ -168,7 +210,7 @@ function LoginForm() {
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl
               bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200/90
-              transition-all duration-200 active:scale-[0.98] shadow-xs disabled:opacity-60 hover:border-blue-300"
+              transition-all duration-200 active:scale-[0.98] shadow-xs disabled:opacity-60 hover:border-blue-300 font-display"
           >
             {loading ? (
               <Loader2 className="animate-spin text-slate-900" size={20} />
@@ -193,7 +235,7 @@ function LoginForm() {
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-200 text-center">
-            <Link href="/" className="text-slate-600 hover:text-ony-blue text-sm font-semibold transition-colors inline-flex items-center gap-1.5">
+            <Link href="/" className="text-slate-600 hover:text-ony-blue text-sm font-semibold transition-colors inline-flex items-center gap-1.5 font-display">
               ← Kembali ke Beranda
             </Link>
           </div>

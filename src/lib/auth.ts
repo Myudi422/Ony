@@ -68,6 +68,16 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: 'jwt' },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      try {
+        const u = new URL(url)
+        if (u.origin === baseUrl) return url
+        // Normalize cross-domain URLs to current host baseUrl (e.g. ony-nfc.vercel.app -> ony.my.id)
+        if (u.pathname) return `${baseUrl}${u.pathname}${u.search}`
+      } catch (_) {}
+      return baseUrl
+    },
     async signIn({ user }) {
       if (!user.email) return false
       const isAdmin = isAdminEmail(user.email)
