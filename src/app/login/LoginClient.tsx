@@ -12,8 +12,11 @@ function LoginForm() {
   const { data: session, status } = useSession()
   const params = useSearchParams()
   const router = useRouter()
-  const callbackUrl = params.get('callbackUrl') ?? '/dashboard'
-  const claimCode = params.get('claim')
+  const rawCallback = params.get('callbackUrl')
+  const claimCode = params.get('claim') || params.get('autoClaim')
+
+  const callbackUrl = rawCallback || (claimCode ? `/c/${claimCode}?autoClaim=${claimCode}` : '/dashboard')
+
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 

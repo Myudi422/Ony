@@ -11,9 +11,9 @@ export async function POST(req: NextRequest) {
   const { code } = await req.json()
   if (!code) return NextResponse.json({ error: 'Activation code required' }, { status: 400 })
 
-  const cleanCode = code.trim().toUpperCase()
+  const cleanCode = String(code).trim().toUpperCase()
 
-  // Verify card exists and is unclaimed
+  // Verify card exists
   const { data: card, error: fetchErr } = await supabaseAdmin
     .from('cards')
     .select('*')
@@ -24,7 +24,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kode aktivasi tidak valid.' }, { status: 404 })
   }
 
-  if (card.status !== 'unclaimed') {
+  // Idempotent check: if already claimed by this exact user
+  if (card.user_id === token.userId) {
+    return NextResponse.json({ success: true, card, message: 'Kartu sudah terhubung dengan akun Anda.' })
+  }
+
+  if (card.status !== 'unclaimed' && card.user_id && card.user_id !== token.userId) {
     return NextResponse.json({ error: 'Kartu ini sudah diaktifkan oleh pengguna lain.' }, { status: 400 })
   }
 
@@ -47,14 +52,16 @@ export async function POST(req: NextRequest) {
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  // Log audit
-  await supabaseAdmin.from('admin_audit_logs').insert({
-    admin_id: token.userId as string,
-    action: 'CLAIM_CARD',
-    target_type: 'CARD',
-    target_id: card.id,
-    details: { code: cleanCode },
-  })
+  // Log audit (fail-safe)
+  try {
+    await supabaseAdmin.from('admin_audit_logs').insert({
+      admin_id: token.userId as string,
+      action: 'CLAIM_CARD',
+      target_type: 'CARD',
+      target_id: card.id,
+      details: { code: cleanCode },
+    })
+  } catch (_) {}
 
   return NextResponse.json({ success: true, card: updated })
 }
