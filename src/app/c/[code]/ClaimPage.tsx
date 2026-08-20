@@ -543,6 +543,15 @@ export default function ClaimPage({
                       </Link>
                     </div>
                   )}
+
+                  {/* Owner Freedom Reassurance Banner */}
+                  <div className="mt-5 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+                    <Sparkles size={16} className="text-ony-blue shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset Kapan Saja:</strong>
+                      Setelah diklaim, pemilik bebas memilih 3 mode respons (Profile, Direct, Review Maps), mengubah isi link, atau menghapus & reset kartu kapan saja melalui Dashboard.
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -603,7 +612,8 @@ export default function ClaimPage({
                     </div>
                   ) : (
                     /* FORM FOR SELLER ACTIVATION */
-                    <form onSubmit={handleSellerSubmit} className="space-y-4 text-left">
+                    <div>
+                      <form onSubmit={handleSellerSubmit} className="space-y-4 text-left">
                       <p className="text-slate-600 text-xs leading-relaxed">
                         Form khusus Seller / Agent untuk mengaktifkan kartu dan langsung mengklaimnya atas nama email pembeli/klien.
                       </p>
@@ -719,7 +729,17 @@ export default function ClaimPage({
                         )}
                       </button>
                     </form>
-                  )}
+
+                    {/* Owner Freedom Reassurance for Seller Activation */}
+                    <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+                      <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset via Dashboard:</strong>
+                        Setelah diaktifkan, pemilik email dapat kapan saja mengedit link, mengubah modus kartu, atau menghapus & reset kartu secara mandiri melalui Dashboard Ony.
+                      </div>
+                    </div>
+                  </div>
+                )}
                 </div>
               )}
             </div>
