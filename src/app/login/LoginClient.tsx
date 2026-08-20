@@ -8,17 +8,6 @@ import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
 import { Suspense, useState, useEffect } from 'react'
 import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
 
-function getBrowserStrategy(): 'popup' | 'redirect' {
-  if (typeof navigator === 'undefined') return 'popup'
-  const ua = navigator.userAgent
-  const isAndroid = /Android/i.test(ua)
-  const isIOS = /iPhone|iPad|iPod/i.test(ua)
-  // ALL mobile must use redirect — Google sets COOP same-origin on their OAuth page
-  // which makes signInWithPopup always fail on mobile regardless of our COOP settings.
-  if (isAndroid || isIOS) return 'redirect'
-  return 'popup'
-}
-
 function LoginForm() {
   const { data: session, status } = useSession()
   const params = useSearchParams()
@@ -52,7 +41,6 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-
   // Redirect if already logged in
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
@@ -61,18 +49,15 @@ function LoginForm() {
   }, [status, session, callbackUrl])
 
   const REDIRECT_PENDING_KEY = 'ony_redirect_pending'
-
-  // If localStorage says we just redirected from Google, show loading immediately
   const hasPendingRedirect = typeof window !== 'undefined' && localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
   const [redirectLoading, setRedirectLoading] = useState(hasPendingRedirect)
 
-  // Handle Firebase Redirect Result on mobile
+  // Handle Firebase Redirect Result (if fallback redirect was used)
   useEffect(() => {
     async function handleRedirectResult() {
       const isPending = localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
-      if (!isPending) return  // Not coming back from a redirect — skip
+      if (!isPending) return
 
-      // Show loading state while we process
       setRedirectLoading(true)
 
       try {
@@ -80,8 +65,7 @@ function LoginForm() {
         localStorage.removeItem(REDIRECT_PENDING_KEY)
 
         if (!fbUser) {
-          // getRedirectResult returned null (Chrome storage partitioning issue, etc.)
-          setErrorMsg('Login Google gagal diproses di Chrome. Coba dengan browser lain, atau aktifkan cookies.')
+          setErrorMsg('Login Google tidak mengembalikan data. Silakan coba lagi.')
           setRedirectLoading(false)
           return
         }
@@ -103,15 +87,13 @@ function LoginForm() {
         window.location.href = callbackUrl
       } catch (err: any) {
         localStorage.removeItem(REDIRECT_PENDING_KEY)
-        setErrorMsg(`Login gagal: ${err?.message || 'Unknown error'}`)
+        setErrorMsg(`Login gagal: ${err?.message || 'Error tidak diketahui'}`)
         setRedirectLoading(false)
-        console.error('Redirect result error:', err)
       }
     }
 
     handleRedirectResult()
 
-    // Also run on pageshow — Chrome BFCache restore won't re-run useEffect
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) handleRedirectResult()
     }
@@ -119,34 +101,15 @@ function LoginForm() {
     return () => window.removeEventListener('pageshow', onPageShow)
   }, [callbackUrl])
 
-
   const handleGoogleLogin = async () => {
     setLoading(true)
     setErrorMsg(null)
 
-    const strategy = getBrowserStrategy()
-
-    // Non-Chrome mobile: use full-page redirect
-    if (strategy === 'redirect') {
-      try {
-        // Mark pending redirect BEFORE navigating away
-        // so we know to call getRedirectResult() when we come back
-        localStorage.setItem('ony_redirect_pending', '1')
-        await loginWithGoogleRedirect()
-        // Browser navigates away — nothing runs after this
-      } catch (err: any) {
-        localStorage.removeItem('ony_redirect_pending')
-        console.error('Redirect init error:', err)
-        setErrorMsg(`Gagal memulai login Google: ${err?.message || err?.code || 'Error tidak diketahui'}`)
-        setLoading(false)
-      }
-      return
-    }
-
-    // Desktop: use popup
     try {
+      // 1. Try Firebase Google Popup first (works on Desktop & Chrome Mobile with unsafe-none COOP)
       const fbUser = await loginWithGoogleFirebase()
 
+      // 2. Authenticate session in NextAuth
       const res = await signIn('firebase', {
         email: fbUser.email,
         name: fbUser.name,
@@ -161,14 +124,28 @@ function LoginForm() {
         return
       }
 
+      // 3. Success -> navigate to target page
       window.location.href = callbackUrl
     } catch (err: any) {
-      console.error('Google Popup error:', err)
+      console.error('Google Auth error:', err)
       const code = err?.code
+
+      // If popup was blocked by browser policies, fall back to redirect
+      if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+        try {
+          localStorage.setItem(REDIRECT_PENDING_KEY, '1')
+          await loginWithGoogleRedirect()
+          return
+        } catch (redirectErr: any) {
+          localStorage.removeItem(REDIRECT_PENDING_KEY)
+          setErrorMsg(`Gagal memulai redirect Google: ${redirectErr?.message}`)
+          setLoading(false)
+          return
+        }
+      }
+
       if (code === 'auth/popup-closed-by-user') {
         setErrorMsg('Login dibatalkan — jendela pop-up ditutup.')
-      } else if (code === 'auth/popup-blocked') {
-        setErrorMsg('Pop-up diblokir browser. Harap izinkan pop-up untuk situs ini.')
       } else {
         setErrorMsg(err?.message || 'Gagal login dengan Google.')
       }
@@ -176,7 +153,7 @@ function LoginForm() {
     }
   }
 
-  if (status === 'loading' || redirectLoading || (loading && getBrowserStrategy() === 'redirect')) {
+  if (status === 'loading' || redirectLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-ony-blue" size={36} />
@@ -273,7 +250,7 @@ function LoginForm() {
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl
               bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200/90
-              transition-all duration-200 active:scale-[0.98] shadow-xs disabled:opacity-60 hover:border-blue-300 font-display"
+              transition-all duration-200 active:scale-[0.98] shadow-xs disabled:opacity-60 hover:border-blue-300 font-display cursor-pointer"
           >
             {loading ? (
               <Loader2 className="animate-spin text-slate-900" size={20} />
