@@ -13,10 +13,8 @@ function getBrowserStrategy(): 'popup' | 'redirect' {
   const ua = navigator.userAgent
   const isAndroid = /Android/i.test(ua)
   const isIOS = /iPhone|iPad|iPod/i.test(ua)
-  const isChrome = /Chrome/i.test(ua) && !/Chromium|Edge|OPR/i.test(ua)
-  // Chrome on Android: COOP is disabled on /login, so popup works
-  if (isAndroid && isChrome) return 'popup'
-  // Other mobile browsers (Samsung, Safari, Firefox, in-app): use redirect
+  // ALL mobile must use redirect — Google sets COOP same-origin on their OAuth page
+  // which makes signInWithPopup always fail on mobile regardless of our COOP settings.
   if (isAndroid || isIOS) return 'redirect'
   return 'popup'
 }
