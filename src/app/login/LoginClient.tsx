@@ -60,17 +60,32 @@ function LoginForm() {
     }
   }, [status, session, callbackUrl])
 
+  const REDIRECT_PENDING_KEY = 'ony_redirect_pending'
+
+  // If localStorage says we just redirected from Google, show loading immediately
+  const hasPendingRedirect = typeof window !== 'undefined' && localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
+  const [redirectLoading, setRedirectLoading] = useState(hasPendingRedirect)
+
   // Handle Firebase Redirect Result on mobile
-  // We listen to both mount AND pageshow (BFCache) because Chrome restores the
-  // page from BFCache after Google redirect instead of doing a fresh reload.
-  // Firebase's getRedirectResult() is idempotent — returns null after the first call.
   useEffect(() => {
     async function handleRedirectResult() {
+      const isPending = localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
+      if (!isPending) return  // Not coming back from a redirect — skip
+
+      // Show loading state while we process
+      setRedirectLoading(true)
+
       try {
         const fbUser = await checkGoogleRedirectResult()
-        if (!fbUser) return
+        localStorage.removeItem(REDIRECT_PENDING_KEY)
 
-        setLoading(true)
+        if (!fbUser) {
+          // getRedirectResult returned null (Chrome storage partitioning issue, etc.)
+          setErrorMsg('Login Google gagal diproses di Chrome. Coba dengan browser lain, atau aktifkan cookies.')
+          setRedirectLoading(false)
+          return
+        }
+
         const res = await signIn('firebase', {
           email: fbUser.email,
           name: fbUser.name,
@@ -81,27 +96,24 @@ function LoginForm() {
 
         if (res?.error) {
           setErrorMsg('Gagal membuat sesi. Silakan coba lagi.')
-          setLoading(false)
+          setRedirectLoading(false)
           return
         }
 
         window.location.href = callbackUrl
       } catch (err: any) {
+        localStorage.removeItem(REDIRECT_PENDING_KEY)
+        setErrorMsg(`Login gagal: ${err?.message || 'Unknown error'}`)
+        setRedirectLoading(false)
         console.error('Redirect result error:', err)
-        // Not a redirect flow or already consumed — silently ignore
       }
     }
 
-    // Run on mount (fresh page load or regular navigation)
     handleRedirectResult()
 
-    // Also run on pageshow — Chrome may restore page from BFCache instead of reloading,
-    // meaning useEffect won't re-fire, but pageshow always fires.
+    // Also run on pageshow — Chrome BFCache restore won't re-run useEffect
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        // Page was restored from BFCache
-        handleRedirectResult()
-      }
+      if (e.persisted) handleRedirectResult()
     }
     window.addEventListener('pageshow', onPageShow)
     return () => window.removeEventListener('pageshow', onPageShow)
@@ -114,12 +126,16 @@ function LoginForm() {
 
     const strategy = getBrowserStrategy()
 
-    // Non-Chrome mobile: use full-page redirect (popup is blocked or causes IndexedDB issues)
+    // Non-Chrome mobile: use full-page redirect
     if (strategy === 'redirect') {
       try {
+        // Mark pending redirect BEFORE navigating away
+        // so we know to call getRedirectResult() when we come back
+        localStorage.setItem('ony_redirect_pending', '1')
         await loginWithGoogleRedirect()
         // Browser navigates away — nothing runs after this
       } catch (err: any) {
+        localStorage.removeItem('ony_redirect_pending')
         setErrorMsg('Gagal memulai login Google. Silakan coba lagi.')
         setLoading(false)
       }
@@ -159,11 +175,11 @@ function LoginForm() {
     }
   }
 
-  if (status === 'loading' || (loading && getBrowserStrategy() === 'redirect')) {
+  if (status === 'loading' || redirectLoading || (loading && getBrowserStrategy() === 'redirect')) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-ony-blue" size={36} />
-        <p className="text-slate-500 text-sm font-semibold">Menghubungkan ke Google...</p>
+        <p className="text-slate-500 text-sm font-semibold">Memproses login Google...</p>
       </div>
     )
   }
