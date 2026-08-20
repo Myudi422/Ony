@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
-import { Suspense, useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
 
 function getBrowserStrategy(): 'popup' | 'redirect' {
@@ -51,7 +51,7 @@ function LoginForm() {
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const redirectHandled = useRef(false)
+
 
   // Redirect if already logged in
   useEffect(() => {
@@ -60,11 +60,11 @@ function LoginForm() {
     }
   }, [status, session, callbackUrl])
 
-  // Handle Firebase Redirect Result on mobile (runs on page load after redirect back from Google)
+  // Handle Firebase Redirect Result on mobile
+  // We listen to both mount AND pageshow (BFCache) because Chrome restores the
+  // page from BFCache after Google redirect instead of doing a fresh reload.
+  // Firebase's getRedirectResult() is idempotent — returns null after the first call.
   useEffect(() => {
-    if (redirectHandled.current) return
-    redirectHandled.current = true
-
     async function handleRedirectResult() {
       try {
         const fbUser = await checkGoogleRedirectResult()
@@ -88,12 +88,25 @@ function LoginForm() {
         window.location.href = callbackUrl
       } catch (err: any) {
         console.error('Redirect result error:', err)
-        // Not a redirect flow — silently ignore
+        // Not a redirect flow or already consumed — silently ignore
       }
     }
 
+    // Run on mount (fresh page load or regular navigation)
     handleRedirectResult()
+
+    // Also run on pageshow — Chrome may restore page from BFCache instead of reloading,
+    // meaning useEffect won't re-fire, but pageshow always fires.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        // Page was restored from BFCache
+        handleRedirectResult()
+      }
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
   }, [callbackUrl])
+
 
   const handleGoogleLogin = async () => {
     setLoading(true)
