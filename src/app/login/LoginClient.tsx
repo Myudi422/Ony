@@ -60,18 +60,16 @@ function LoginForm() {
       // 1. Open Firebase Google Popup
       const fbUser = await loginWithGoogleFirebase()
 
-      // 2. Build absolute callback URL for NextAuth's internal URL parser
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ony.my.id'
-      const absoluteCallback = origin + callbackUrl
-
-      // 3. Authorize session in NextAuth via Firebase credentials
+      // 2. Authorize session in NextAuth via Firebase credentials
+      // NOTE: Do NOT pass callbackUrl here — NextAuth's internal URL constructor
+      // throws "Failed to construct 'URL': Invalid URL" on relative paths.
+      // We handle the redirect ourselves after the session is created.
       const res = await signIn('firebase', {
         email: fbUser.email,
         name: fbUser.name,
         image: fbUser.photoURL,
         uid: fbUser.uid,
         redirect: false,
-        callbackUrl: absoluteCallback,
       })
 
       if (res?.error) {
