@@ -20,23 +20,16 @@ function LoginForm() {
 
   if (rawCallback) {
     try {
-      if (rawCallback.startsWith('http://') || rawCallback.startsWith('https://')) {
-        const u = new URL(rawCallback)
-        relativeCallback = u.pathname + u.search
-        const matchCode = u.pathname.match(/\/c\/([A-Za-z0-9_-]+)/)
-        if (matchCode && !claimCode) {
-          claimCode = matchCode[1]
-        }
-        const autoClaimInUrl = u.searchParams.get('autoClaim') || u.searchParams.get('claim')
-        if (autoClaimInUrl && !claimCode) {
-          claimCode = autoClaimInUrl
-        }
-      } else {
-        relativeCallback = rawCallback
-        const matchCode = rawCallback.match(/\/c\/([A-Za-z0-9_-]+)/)
-        if (matchCode && !claimCode) {
-          claimCode = matchCode[1]
-        }
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ony.my.id'
+      const u = new URL(rawCallback, origin)
+      relativeCallback = u.pathname + u.search
+      const matchCode = u.pathname.match(/\/c\/([A-Za-z0-9_-]+)/)
+      if (matchCode && !claimCode) {
+        claimCode = matchCode[1]
+      }
+      const autoClaimInUrl = u.searchParams.get('autoClaim') || u.searchParams.get('claim')
+      if (autoClaimInUrl && !claimCode) {
+        claimCode = autoClaimInUrl
       }
     } catch (_) {
       relativeCallback = rawCallback.startsWith('/') ? rawCallback : '/dashboard'

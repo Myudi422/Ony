@@ -73,7 +73,7 @@ export const authOptions: NextAuthOptions = {
       if (url.startsWith('/')) return url
 
       try {
-        const u = new URL(url)
+        const u = new URL(url, baseUrl)
         // If same origin, return relative pathname + search to avoid domain mismatch
         if (u.pathname) return `${u.pathname}${u.search}`
       } catch (_) {}
