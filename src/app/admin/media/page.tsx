@@ -1351,60 +1351,60 @@ export default function AdminMediaPage() {
       {/* MOCKUP CARD PRINT PREVIEW MODAL (3.4" x 2.1") */}
       <Dialog open={!!mockupModalCard} onOpenChange={(open) => !open && setMockupModalCard(null)}>
         {mockupModalCard && (
-          <DialogContent className="max-w-md p-6 bg-white rounded-3xl border border-slate-200 shadow-2xl">
+          <DialogContent className="w-[95vw] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 bg-white rounded-3xl border border-slate-200 shadow-2xl">
             <DialogHeader className="text-left space-y-1 border-b border-slate-100 pb-3">
-              <DialogTitle className="text-slate-900 font-extrabold text-base flex items-center gap-2 font-display">
-                <CreditCard size={18} className="text-amber-500" />
-                <span>Mockup Cetak Kartu ({mockupModalCard.activation_code})</span>
+              <DialogTitle className="text-slate-900 font-extrabold text-sm sm:text-base flex items-center gap-2 font-display">
+                <CreditCard size={18} className="text-amber-500 shrink-0" />
+                <span className="truncate">Mockup Cetak ({mockupModalCard.activation_code})</span>
               </DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs">
-                Ukuran cetak standar <strong>3,4 inc x 2,1 inc</strong> (CR80 vertical, high-resolution 300 DPI).
+              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs">
+                Ukuran cetak standar <strong>3,4 inc x 2,1 inc</strong> (CR80 vertical, 300 DPI).
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 pt-2 text-center">
+            <div className="space-y-3.5 pt-1 text-center">
               {/* Tab Selector: Depan vs Belakang */}
               <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setMockupSide('front')}
                   className={cn(
-                    'flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    'flex-1 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
                     mockupSide === 'front'
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800'
                   )}
                 >
-                  <span className="w-2 h-2 rounded-full bg-slate-800" />
-                  Sisi Depan (Putih + QR)
+                  <span className="w-2 h-2 rounded-full bg-slate-800 shrink-0" />
+                  <span>Depan (Putih)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMockupSide('back')}
                   className={cn(
-                    'flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    'flex-1 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
                     mockupSide === 'back'
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800'
                   )}
                 >
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  Sisi Belakang (Hitam)
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <span>Belakang (Hitam)</span>
                 </button>
               </div>
 
               {/* Card Canvas Image Preview */}
-              <div className="relative bg-slate-900/5 p-4 rounded-2xl border border-slate-200 flex items-center justify-center min-h-[300px]">
+              <div className="relative bg-slate-900/5 p-2 sm:p-4 rounded-2xl border border-slate-200 flex items-center justify-center min-h-[200px] sm:min-h-[280px] overflow-hidden">
                 {mockupLoading ? (
-                  <div className="flex flex-col items-center gap-2 text-slate-500 text-xs font-semibold py-12">
+                  <div className="flex flex-col items-center gap-2 text-slate-500 text-xs font-semibold py-8">
                     <Loader2 size={24} className="animate-spin text-amber-500" />
-                    <span>Rendering mockup cetak...</span>
+                    <span>Rendering mockup...</span>
                   </div>
                 ) : (mockupSide === 'front' ? mockupCanvasUrl : mockupBackCanvasUrl) ? (
                   <img
                     src={mockupSide === 'front' ? mockupCanvasUrl! : mockupBackCanvasUrl!}
                     alt={`Mockup Kartu ${mockupSide} ${mockupModalCard.activation_code}`}
-                    className="max-h-[360px] rounded-xl shadow-lg border border-slate-300 transition-transform hover:scale-[1.02]"
+                    className="max-h-[35vh] sm:max-h-[320px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-300 transition-transform hover:scale-[1.01]"
                   />
                 ) : (
                   <span className="text-xs text-slate-400">Gagal memuat preview.</span>
@@ -1414,7 +1414,7 @@ export default function AdminMediaPage() {
               {/* Adjustments (Offset & Size) - only active on Front Side */}
               {mockupSide === 'front' && (
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-left animate-fade-in">
-                  <span className="text-[11px] font-bold text-slate-700 block font-display">⚡ Penyesuaian Posisi QR di Sisi Depan:</span>
+                  <span className="text-[11px] font-bold text-slate-700 block font-display">⚡ Penyesuaian Posisi QR Sisi Depan:</span>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <label className="text-[10px] text-slate-500 block">Posisi X ({mockupQrX}px)</label>
@@ -1465,13 +1465,13 @@ export default function AdminMediaPage() {
                   type="button"
                   onClick={() => handleDownloadBatchPdf([mockupModalCard])}
                   disabled={!!pdfProgress}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 transition-all font-display cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 sm:py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 transition-all font-display cursor-pointer disabled:opacity-50"
                 >
                   <FileText size={15} />
-                  <span>Download PDF Cetak (2 Halaman: Depan + Belakang)</span>
+                  <span>Download PDF Cetak (Depan + Belakang)</span>
                 </button>
 
-                <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                   <button
                     type="button"
                     onClick={() => handleDownloadBatchZip([mockupModalCard])}
@@ -1494,7 +1494,7 @@ export default function AdminMediaPage() {
                 <button
                   type="button"
                   onClick={() => setMockupModalCard(null)}
-                  className="w-full py-2.5 rounded-2xl border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-100 transition-all font-display cursor-pointer mt-1"
+                  className="w-full py-2 rounded-2xl border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-100 transition-all font-display cursor-pointer mt-1"
                 >
                   Tutup Window
                 </button>
