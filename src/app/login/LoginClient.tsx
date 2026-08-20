@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
 import { Suspense, useState, useEffect } from 'react'
-import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
+import { loginWithGoogleFirebase } from '@/lib/firebase'
 
 function LoginForm() {
   const { data: session, status } = useSession()
@@ -15,7 +15,7 @@ function LoginForm() {
   const rawCallback = params.get('callbackUrl')
   let claimCode = params.get('claim') || params.get('autoClaim')
 
-  // Always force callbackUrl to be a relative path on current host (e.g. /dashboard or /c/CODE?autoClaim=CODE)
+  // Extract relative callback URL
   let relativeCallback = '/dashboard'
 
   if (rawCallback) {
@@ -50,87 +50,49 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // 1. If user is ALREADY authenticated, immediately redirect away from /login
+  // Redirect if user is ALREADY logged in
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       window.location.replace(callbackUrl)
     }
   }, [status, session, callbackUrl])
 
-  // 2. Check Firebase Google Redirect Result on page mount (for mobile redirect flow)
-  useEffect(() => {
-    let mounted = true
-    async function processRedirectResult() {
-      try {
-        const fbUser = await checkGoogleRedirectResult()
-        if (fbUser && mounted) {
-          setLoading(true)
-          // Use NextAuth native redirect to ensure cookies & navigation trigger automatically
-          await signIn('firebase', {
-            email: fbUser.email,
-            name: fbUser.name,
-            image: fbUser.photoURL,
-            uid: fbUser.uid,
-            callbackUrl,
-          })
-        }
-      } catch (err: any) {
-        console.error('Redirect result error:', err)
-        if (mounted) {
-          setErrorMsg('Gagal memproses login Google.')
-          setLoading(false)
-        }
-      }
-    }
-
-    if (status === 'unauthenticated') {
-      processRedirectResult()
-    }
-
-    return () => {
-      mounted = false
-    }
-  }, [status, callbackUrl])
-
+  // Pure Google Popup Handler
   const handleGoogleLogin = async () => {
     setLoading(true)
     setErrorMsg(null)
 
-    // Try NextAuth native Google Provider first if available
     try {
-      const res = await signIn('google', { callbackUrl, redirect: false })
-      if (res?.url && !res.error) {
-        window.location.href = res.url
+      // 1. Open Firebase Google Popup
+      const fbUser = await loginWithGoogleFirebase()
+
+      // 2. Authorize session in NextAuth via Firebase credentials
+      const res = await signIn('firebase', {
+        email: fbUser.email,
+        name: fbUser.name,
+        image: fbUser.photoURL,
+        uid: fbUser.uid,
+        redirect: false,
+      })
+
+      if (res?.error) {
+        setErrorMsg('Gagal membuat sesi login. Silakan coba lagi.')
+        setLoading(false)
         return
       }
-    } catch (_) {}
 
-    // Fallback: Use Firebase Auth
-    const isMobileDevice = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
-    try {
-      if (isMobileDevice) {
-        await loginWithGoogleRedirect()
-        return
+      // 3. Immediately redirect to target page
+      window.location.href = callbackUrl
+    } catch (err: any) {
+      console.error('Google Popup error:', err)
+      const code = err?.code
+      if (code === 'auth/popup-closed-by-user') {
+        setErrorMsg('Login dibatalkan karena jendela pop-up ditutup.')
+      } else if (code === 'auth/popup-blocked') {
+        setErrorMsg('Jendela pop-up diblokir oleh browser. Harap izinkan pop-up untuk situs ini.')
+      } else {
+        setErrorMsg(err?.message || 'Gagal login dengan Google Popup.')
       }
-
-      // Desktop: Popup flow
-      try {
-        const fbUser = await loginWithGoogleFirebase()
-        await signIn('firebase', {
-          email: fbUser.email,
-          name: fbUser.name,
-          image: fbUser.photoURL,
-          uid: fbUser.uid,
-          callbackUrl,
-        })
-      } catch (popupErr: any) {
-        console.warn('Popup login failed, trying redirect:', popupErr)
-        await loginWithGoogleRedirect()
-      }
-    } catch (err: unknown) {
-      console.error('Firebase Auth error:', err)
-      setErrorMsg('Gagal membuka login Google. Silakan coba lagi.')
       setLoading(false)
     }
   }
