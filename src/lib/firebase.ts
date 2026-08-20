@@ -1,12 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
+  initializeAuth,
   getAuth,
+  browserLocalPersistence,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  browserSessionPersistence,
-  setPersistence,
 } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -15,12 +15,25 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 }
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
-export const auth = getAuth(app)
+function getFirebaseAuth() {
+  if (!getApps().length) {
+    const app = initializeApp(firebaseConfig)
+    if (typeof window !== 'undefined') {
+      return initializeAuth(app, {
+        persistence: browserLocalPersistence,
+      })
+    }
+    return getAuth(app)
+  }
+  const app = getApp()
+  return getAuth(app)
+}
+
+export const auth = getFirebaseAuth()
 export const googleProvider = new GoogleAuthProvider()
 googleProvider.setCustomParameters({ prompt: 'select_account' })
 
-/** Desktop: Popup-based login (fast, in-place) */
+/** Desktop: Popup-based login */
 export async function loginWithGoogleFirebase() {
   const result = await signInWithPopup(auth, googleProvider)
   const user = result.user
@@ -33,24 +46,20 @@ export async function loginWithGoogleFirebase() {
   }
 }
 
-/**
- * Mobile: Full-page redirect login.
- * Uses browserSessionPersistence (sessionStorage) instead of IndexedDB so that
- * Chrome's storage partitioning doesn't cause getRedirectResult() to return null.
- */
+/** Mobile: Full-page redirect login */
 export async function loginWithGoogleRedirect() {
-  await setPersistence(auth, browserSessionPersistence)
   await signInWithRedirect(auth, googleProvider)
 }
 
 /**
  * Called on page mount after mobile redirect returns from Google.
- * Must use the same persistence as loginWithGoogleRedirect so the stored
- * state can be read back.
+ * Waits for authStateReady before reading getRedirectResult.
  */
 export async function checkGoogleRedirectResult() {
   try {
-    await setPersistence(auth, browserSessionPersistence)
+    if (auth.authStateReady) {
+      await auth.authStateReady()
+    }
     const result = await getRedirectResult(auth)
     if (result && result.user) {
       const user = result.user
@@ -64,6 +73,7 @@ export async function checkGoogleRedirectResult() {
     }
   } catch (err) {
     console.error('Firebase redirect result error:', err)
+    throw err
   }
   return null
 }
