@@ -10,6 +10,13 @@ import { formatDate, MEDIA_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import {
+  downloadSingleCardMockup,
+  downloadCardMockupsZIP,
+  downloadCardMockupPDF,
+  generateCardMockupCanvas,
+  generateCardBackCanvas,
+} from '@/lib/mockup-generator'
 
 interface Card {
   id: string
@@ -64,6 +71,101 @@ export default function AdminMediaPage() {
   const [showLogo, setShowLogo] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
+
+  // Mockup Card Generator Modal State
+  const [mockupModalCard, setMockupModalCard] = useState<Card | null>(null)
+  const [mockupCanvasUrl, setMockupCanvasUrl] = useState<string | null>(null)
+  const [mockupBackCanvasUrl, setMockupBackCanvasUrl] = useState<string | null>(null)
+  const [mockupSide, setMockupSide] = useState<'front' | 'back'>('front')
+  const [mockupLoading, setMockupLoading] = useState(false)
+  const [zipProgress, setZipProgress] = useState<{ completed: number; total: number } | null>(null)
+  const [pdfProgress, setPdfProgress] = useState<{ completed: number; total: number } | null>(null)
+
+  // Custom Mockup adjustments (Defaults: X=174, Y=444, Size=280)
+  const [mockupQrX, setMockupQrX] = useState(174)
+  const [mockupQrY, setMockupQrY] = useState(444)
+  const [mockupQrSize, setMockupQrSize] = useState(280)
+
+  const handleOpenMockupModal = async (card: Card) => {
+    setMockupModalCard(card)
+    setMockupSide('front')
+    setMockupLoading(true)
+    setMockupCanvasUrl(null)
+    setMockupBackCanvasUrl(null)
+    try {
+      const [frontCanvas, backCanvas] = await Promise.all([
+        generateCardMockupCanvas(card.activation_code, {
+          qrX: mockupQrX,
+          qrY: mockupQrY,
+          qrSize: mockupQrSize,
+        }),
+        generateCardBackCanvas(card.activation_code, {
+          qrX: mockupQrX,
+          qrY: mockupQrY,
+          qrSize: mockupQrSize,
+        }),
+      ])
+      setMockupCanvasUrl(frontCanvas.toDataURL('image/png'))
+      setMockupBackCanvasUrl(backCanvas.toDataURL('image/png'))
+    } catch (_) {
+      showToast('Gagal memuat canvas mockup.')
+    }
+    setMockupLoading(false)
+  }
+
+  const handleUpdateMockupCanvas = async () => {
+    if (!mockupModalCard) return
+    setMockupLoading(true)
+    try {
+      const [frontCanvas, backCanvas] = await Promise.all([
+        generateCardMockupCanvas(mockupModalCard.activation_code, {
+          qrX: mockupQrX,
+          qrY: mockupQrY,
+          qrSize: mockupQrSize,
+        }),
+        generateCardBackCanvas(mockupModalCard.activation_code, {
+          qrX: mockupQrX,
+          qrY: mockupQrY,
+          qrSize: mockupQrSize,
+        }),
+      ])
+      setMockupCanvasUrl(frontCanvas.toDataURL('image/png'))
+      setMockupBackCanvasUrl(backCanvas.toDataURL('image/png'))
+    } catch (_) {}
+    setMockupLoading(false)
+  }
+
+  const handleDownloadBatchZip = async (targetCards: Card[] = selectedCards) => {
+    if (targetCards.length === 0) return
+    setZipProgress({ completed: 0, total: targetCards.length })
+    try {
+      await downloadCardMockupsZIP(
+        targetCards,
+        { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize },
+        (completed, total) => setZipProgress({ completed, total })
+      )
+      showToast(`✨ Berhasil men-download ZIP batch ${targetCards.length} kartu (Depan + Belakang + PDF)!`)
+    } catch (err: any) {
+      alert(`Gagal download batch ZIP: ${err?.message || 'Error'}`)
+    }
+    setZipProgress(null)
+  }
+
+  const handleDownloadBatchPdf = async (targetCards: Card[] = selectedCards) => {
+    if (targetCards.length === 0) return
+    setPdfProgress({ completed: 0, total: targetCards.length })
+    try {
+      await downloadCardMockupPDF(
+        targetCards,
+        { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize },
+        (completed, total) => setPdfProgress({ completed, total })
+      )
+      showToast(`📄 Berhasil men-download PDF cetak Duplex ${targetCards.length} kartu!`)
+    } catch (err: any) {
+      alert(`Gagal download PDF: ${err?.message || 'Error'}`)
+    }
+    setPdfProgress(null)
+  }
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
 
@@ -747,6 +849,24 @@ export default function AdminMediaPage() {
               <Tag size={13} /> Salin {selectedIds.length} Kode
             </button>
             <button
+              onClick={() => handleDownloadBatchPdf()}
+              disabled={!!pdfProgress}
+              className="flex items-center gap-1.5 text-xs text-blue-950 bg-gradient-to-r from-blue-300 via-sky-400 to-blue-500 hover:from-blue-400 hover:to-blue-600 px-3.5 py-2 rounded-xl transition-all shadow-md font-extrabold cursor-pointer disabled:opacity-50"
+              title="Download PDF cetak 2 sisi (Putih 1, Hitam 1, Putih 2, Hitam 2...)"
+            >
+              {pdfProgress ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+              <span>{pdfProgress ? `Generat PDF (${pdfProgress.completed}/${pdfProgress.total})...` : `Download PDF Duplex (${selectedIds.length})`}</span>
+            </button>
+            <button
+              onClick={() => handleDownloadBatchZip()}
+              disabled={!!zipProgress}
+              className="flex items-center gap-1.5 text-xs text-amber-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 px-3.5 py-2 rounded-xl transition-all shadow-md font-extrabold cursor-pointer disabled:opacity-50"
+              title="Download semua mockup kartu cetak (Depan + Belakang + PDF) dalam file ZIP"
+            >
+              {zipProgress ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              <span>{zipProgress ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...` : `Download Package ZIP (${selectedIds.length})`}</span>
+            </button>
+            <button
               onClick={() => bulkCopyCSV()}
               className="flex items-center gap-1.5 text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-2 rounded-xl transition-all font-semibold"
               title="Salin format CSV untuk printer NFC"
@@ -928,6 +1048,13 @@ export default function AdminMediaPage() {
                           title="Preview QR & Link"
                         >
                           <Eye size={12} /> QR
+                        </button>
+                        <button
+                          onClick={() => handleOpenMockupModal(card)}
+                          className="flex items-center gap-1 text-[11px] text-amber-900 bg-amber-50 border border-amber-300 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-all font-bold cursor-pointer"
+                          title="Preview & Download Mockup Print (3.4 x 2.1 inc)"
+                        >
+                          <CreditCard size={12} /> Mockup Print
                         </button>
                         {(card.users || card.status !== 'unclaimed') && (
                           <button
@@ -1215,6 +1342,162 @@ export default function AdminMediaPage() {
                     <Download size={13} /> Unduh SVG Vector
                   </button>
                 </div>
+              </div>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      {/* MOCKUP CARD PRINT PREVIEW MODAL (3.4" x 2.1") */}
+      <Dialog open={!!mockupModalCard} onOpenChange={(open) => !open && setMockupModalCard(null)}>
+        {mockupModalCard && (
+          <DialogContent className="max-w-md p-6 bg-white rounded-3xl border border-slate-200 shadow-2xl">
+            <DialogHeader className="text-left space-y-1 border-b border-slate-100 pb-3">
+              <DialogTitle className="text-slate-900 font-extrabold text-base flex items-center gap-2 font-display">
+                <CreditCard size={18} className="text-amber-500" />
+                <span>Mockup Cetak Kartu ({mockupModalCard.activation_code})</span>
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs">
+                Ukuran cetak standar <strong>3,4 inc x 2,1 inc</strong> (CR80 vertical, high-resolution 300 DPI).
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2 text-center">
+              {/* Tab Selector: Depan vs Belakang */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setMockupSide('front')}
+                  className={cn(
+                    'flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    mockupSide === 'front'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  )}
+                >
+                  <span className="w-2 h-2 rounded-full bg-slate-800" />
+                  Sisi Depan (Putih + QR)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMockupSide('back')}
+                  className={cn(
+                    'flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    mockupSide === 'back'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  )}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  Sisi Belakang (Hitam)
+                </button>
+              </div>
+
+              {/* Card Canvas Image Preview */}
+              <div className="relative bg-slate-900/5 p-4 rounded-2xl border border-slate-200 flex items-center justify-center min-h-[300px]">
+                {mockupLoading ? (
+                  <div className="flex flex-col items-center gap-2 text-slate-500 text-xs font-semibold py-12">
+                    <Loader2 size={24} className="animate-spin text-amber-500" />
+                    <span>Rendering mockup cetak...</span>
+                  </div>
+                ) : (mockupSide === 'front' ? mockupCanvasUrl : mockupBackCanvasUrl) ? (
+                  <img
+                    src={mockupSide === 'front' ? mockupCanvasUrl! : mockupBackCanvasUrl!}
+                    alt={`Mockup Kartu ${mockupSide} ${mockupModalCard.activation_code}`}
+                    className="max-h-[360px] rounded-xl shadow-lg border border-slate-300 transition-transform hover:scale-[1.02]"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400">Gagal memuat preview.</span>
+                )}
+              </div>
+
+              {/* Adjustments (Offset & Size) - only active on Front Side */}
+              {mockupSide === 'front' && (
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-left animate-fade-in">
+                  <span className="text-[11px] font-bold text-slate-700 block font-display">⚡ Penyesuaian Posisi QR di Sisi Depan:</span>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Posisi X ({mockupQrX}px)</label>
+                      <input
+                        type="range"
+                        min={100}
+                        max={200}
+                        value={mockupQrX}
+                        onChange={e => setMockupQrX(Number(e.target.value))}
+                        onMouseUp={handleUpdateMockupCanvas}
+                        onTouchEnd={handleUpdateMockupCanvas}
+                        className="w-full cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Posisi Y ({mockupQrY}px)</label>
+                      <input
+                        type="range"
+                        min={350}
+                        max={460}
+                        value={mockupQrY}
+                        onChange={e => setMockupQrY(Number(e.target.value))}
+                        onMouseUp={handleUpdateMockupCanvas}
+                        onTouchEnd={handleUpdateMockupCanvas}
+                        className="w-full cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Ukuran ({mockupQrSize}px)</label>
+                      <input
+                        type="range"
+                        min={220}
+                        max={340}
+                        value={mockupQrSize}
+                        onChange={e => setMockupQrSize(Number(e.target.value))}
+                        onMouseUp={handleUpdateMockupCanvas}
+                        onTouchEnd={handleUpdateMockupCanvas}
+                        className="w-full cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons: PDF Duplex & Package Downloads */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadBatchPdf([mockupModalCard])}
+                  disabled={!!pdfProgress}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 transition-all font-display cursor-pointer disabled:opacity-50"
+                >
+                  <FileText size={15} />
+                  <span>Download PDF Cetak (2 Halaman: Depan + Belakang)</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadBatchZip([mockupModalCard])}
+                    disabled={!!zipProgress}
+                    className="py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all font-display cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>Download ZIP (Depan & Belakang)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadSingleCardMockup(mockupModalCard.activation_code, { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize })}
+                    className="py-2.5 px-3 rounded-2xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-all font-display cursor-pointer"
+                  >
+                    <Download size={13} />
+                    <span>PNG Depan Saja</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMockupModalCard(null)}
+                  className="w-full py-2.5 rounded-2xl border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-100 transition-all font-display cursor-pointer mt-1"
+                >
+                  Tutup Window
+                </button>
               </div>
             </div>
           </DialogContent>
