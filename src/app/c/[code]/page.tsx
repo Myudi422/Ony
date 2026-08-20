@@ -111,8 +111,8 @@ export default async function CardPage({ params, searchParams }: Props) {
     return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
 
-  // Active — Direct Mode
-  if (card.mode === 'direct' && card.redirect_url) {
+  // Active — Direct Mode or Google Review Maps Mode
+  if ((card.mode === 'direct' || card.mode === 'review' || card.mode === 'google_review') && card.redirect_url) {
     redirect(card.redirect_url)
   }
 

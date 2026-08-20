@@ -6,7 +6,7 @@ import {
   CreditCard, Tag, Tv, Key, QrCode, Globe, MessageCircle,
   Instagram, Linkedin, Youtube, Twitter, Mail, Phone, FileText,
   ShoppingBag, Check, Activity, Eye, RefreshCw, Power, Edit3,
-  AlertCircle, CheckCircle2, X
+  AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles
 } from 'lucide-react'
 import { cn, MEDIA_TYPE_LABELS, STATUS_COLORS, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -53,6 +53,7 @@ const PLATFORM_OPTIONS: Record<string, { label: string; icon: React.ElementType;
   linkedin:  { label: 'LinkedIn', icon: Linkedin, placeholder: 'https://linkedin.com/in/username', defaultTitle: 'LinkedIn Profile' },
   youtube:   { label: 'YouTube', icon: Youtube, placeholder: 'https://youtube.com/@channel', defaultTitle: 'Channel YouTube' },
   twitter:   { label: 'X / Twitter', icon: Twitter, placeholder: 'https://x.com/username', defaultTitle: 'X / Twitter' },
+  maps:      { label: 'Google Maps / Lokasi', icon: MapPin, placeholder: 'https://maps.google.com/?q=-6.200000,106.816666 atau https://goo.gl/maps/...', defaultTitle: 'Lokasi Google Maps' },
   email:     { label: 'Email', icon: Mail, placeholder: 'mailto:email@domain.com', defaultTitle: 'Kirim Email' },
   phone:     { label: 'Telepon', icon: Phone, placeholder: 'tel:+628123456789', defaultTitle: 'Telepon' },
   website:   { label: 'Website', icon: Globe, placeholder: 'https://website.com', defaultTitle: 'Website Utama' },
@@ -82,6 +83,67 @@ export default function CardsPage() {
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null)
   const [submittingLink, setSubmittingLink] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+
+  // Delete / Unlink Card Modal States
+  const [deletingCard, setDeletingCard] = useState<Card | null>(null)
+  const [isDeletingCard, setIsDeletingCard] = useState(false)
+
+  const handleDeleteCardConfirmed = async () => {
+    if (!deletingCard) return
+    setIsDeletingCard(true)
+
+    try {
+      const res = await fetch(`/api/cards/${deletingCard.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        showToast(data.error || 'Gagal menghapus kartu.', 'error')
+        setIsDeletingCard(false)
+        return
+      }
+
+      // Success! Remove card from local state
+      const remainingCards = cards.filter(c => c.id !== deletingCard.id)
+      setCards(remainingCards)
+      setSelected(remainingCards.length > 0 ? remainingCards[0] : null)
+      setDeletingCard(null)
+      showToast('Kartu berhasil dihapus & di-reset ke status unclaimed!')
+    } catch (_) {
+      showToast('Terjadi kesalahan saat menghapus kartu.', 'error')
+    }
+    setIsDeletingCard(false)
+  }
+
+  // Google Review generator state
+  const [generatingReview, setGeneratingReview] = useState(false)
+  const [reviewNote, setReviewNote] = useState<string | null>(null)
+
+  const handleGenerateReviewLink = async () => {
+    if (!selected?.redirect_url) return
+    setGeneratingReview(true)
+    setReviewNote(null)
+
+    try {
+      const res = await fetch('/api/tools/google-review-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: selected.redirect_url }),
+      })
+      const data = await res.json()
+      if (data.reviewUrl) {
+        setSelected({ ...selected, redirect_url: data.reviewUrl })
+        showToast('Link ulasan bintang 5 Google berhasil diproses!')
+        if (data.note) setReviewNote(data.note)
+      } else if (data.error) {
+        showToast(data.error, 'error')
+      }
+    } catch (_) {
+      showToast('Gagal memproses link Google Maps.', 'error')
+    }
+    setGeneratingReview(false)
+  }
 
   const [linkForm, setLinkForm] = useState({
     title: '',
@@ -449,12 +511,13 @@ export default function CardsPage() {
                       {/* Mode Selection */}
                       <div>
                         <label className="text-slate-700 text-xs mb-2 block font-semibold">Modus Respons Tap NFC / Scan QR</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200 min-w-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200 min-w-0">
+                          {/* 1. Profile Mode */}
                           <button
                             type="button"
                             onClick={() => setSelected({ ...selected, mode: 'profile' })}
                             className={cn(
-                              'py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
+                              'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
                               selected.mode === 'profile'
                                 ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
@@ -463,23 +526,41 @@ export default function CardsPage() {
                             <span className="flex items-center gap-1.5 font-display">
                               <Globe size={14} /> Profile Mode
                             </span>
-                            <span className="text-[10px] text-slate-500 font-normal">Tampilkan halaman profil & daftar link</span>
+                            <span className="text-[10px] text-slate-500 font-normal">Halaman profil & link</span>
                           </button>
 
+                          {/* 2. Direct Redirect Mode */}
                           <button
                             type="button"
                             onClick={() => setSelected({ ...selected, mode: 'direct' })}
                             className={cn(
-                              'py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center',
+                              'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
                               selected.mode === 'direct'
                                 ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
                             <span className="flex items-center gap-1.5 font-display">
-                              <ExternalLink size={14} /> Direct Redirect Mode
+                              <ExternalLink size={14} /> Direct Redirect
                             </span>
-                            <span className="text-[10px] text-slate-500 font-normal">Langsung alihkan ke URL / WhatsApp</span>
+                            <span className="text-[10px] text-slate-500 font-normal">URL / WhatsApp Kustom</span>
+                          </button>
+
+                          {/* 3. Google Review Maps Mode */}
+                          <button
+                            type="button"
+                            onClick={() => setSelected({ ...selected, mode: 'google_review' })}
+                            className={cn(
+                              'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
+                              (selected.mode === 'google_review' || selected.mode === 'review')
+                                ? 'bg-white text-amber-600 shadow-sm border border-amber-200'
+                                : 'text-slate-600 hover:text-slate-900'
+                            )}
+                          >
+                            <span className="flex items-center gap-1.5 font-display">
+                              <Star size={14} className="fill-amber-400 text-amber-500" /> Review Maps
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-normal">Ulasan Bintang 5 Google</span>
                           </button>
                         </div>
 
@@ -495,6 +576,43 @@ export default function CardsPage() {
                             />
                           </div>
                         )}
+
+                        {/* Google Review Maps Target URL & Converter */}
+                        {(selected.mode === 'google_review' || selected.mode === 'review') && (
+                          <div className="mt-4 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                            <div>
+                              <label className="text-amber-900 text-xs font-bold mb-1 flex items-center justify-between">
+                                <span>Target URL Google Maps / Review</span>
+                                <span className="text-[11px] font-normal text-amber-700">⭐ Auto 5-Star Dialog</span>
+                              </label>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <input
+                                  className="input-field text-sm bg-white flex-1 font-mono"
+                                  value={selected.redirect_url ?? ''}
+                                  onChange={e => setSelected({ ...selected, redirect_url: e.target.value })}
+                                  placeholder="https://maps.app.goo.gl/... atau URL ulasan Google Maps"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleGenerateReviewLink}
+                                  disabled={generatingReview || !selected.redirect_url}
+                                  className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs cursor-pointer"
+                                >
+                                  {generatingReview ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                  {generatingReview ? 'Memproses...' : 'Format Link 5-Star'}
+                                </button>
+                              </div>
+                            </div>
+                            {reviewNote && (
+                              <p className="text-[11px] text-amber-800 bg-amber-100/60 p-2 rounded-lg border border-amber-200">
+                                ℹ️ {reviewNote}
+                              </p>
+                            )}
+                            <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                              💡 <strong>Tips Review Maps:</strong> Masukkan link Google Maps bisnis kamu, lalu klik <em>Format Link 5-Star</em>. Saat kartu di-tap atau di-scan pelanggan, browser akan langsung membuka dialog beri ulasan 5 bintang secara otomatis!
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Explicit Manual Save Button */}
@@ -506,6 +624,23 @@ export default function CardsPage() {
                         <Save size={16} />
                         {savingCard ? 'Menyimpan Perubahan...' : 'Simpan Perubahan Kartu'}
                       </button>
+
+                      {/* Danger Zone: Unlink / Delete Card */}
+                      <div className="pt-4 mt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-50/50 p-4 rounded-xl border border-rose-100">
+                        <div>
+                          <h3 className="text-xs font-bold text-rose-900 font-display">Putuskan & Reset Kartu</h3>
+                          <p className="text-[11px] text-rose-700/80">
+                            Hapus kartu ini dari akun kamu, hapus seluruh data tautan & statistik agar kartu menjadi fresh (unclaimed) kembali.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingCard(selected)}
+                          className="px-3.5 py-2 rounded-xl bg-white border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs cursor-pointer"
+                        >
+                          <Trash2 size={14} /> Hapus Kartu
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -846,6 +981,50 @@ export default function CardsPage() {
             >
               {submittingLink ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
               Update Link
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* ⚠️ DIALOG KONFIRMASI HAPUS & RESET KARTU                   */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <Dialog open={!!deletingCard} onOpenChange={open => !open && setDeletingCard(null)}>
+        <DialogContent className="max-w-md bg-white border-slate-200 shadow-xl rounded-2xl p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg font-bold text-rose-600 flex items-center gap-2 font-display">
+              <Trash2 size={20} /> Hapus & Reset Kartu
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600 mt-1">
+              Apakah kamu yakin ingin menghapus kartu <strong className="text-slate-900">{deletingCard?.card_name}</strong> ({deletingCard?.activation_code}) dari akun kamu?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs space-y-1.5 mb-4">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+              <AlertCircle size={15} className="text-amber-600 shrink-0" /> Efek Penghapusan Kartu:
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-900/80">
+              <li>Seluruh link tautan pada kartu ini akan dihapus permanen.</li>
+              <li>Riwayat & statistik tap/scan akan dibersihkan hingga 0.</li>
+              <li>Status kartu kembali menjadi <strong>unclaimed</strong> dan siap diklaim ulang oleh siapa saja.</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 mt-2">
+            <button
+              onClick={() => setDeletingCard(null)}
+              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleDeleteCardConfirmed}
+              disabled={isDeletingCard}
+              className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-5 text-xs font-bold flex items-center gap-1.5 rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-60"
+            >
+              {isDeletingCard ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Hapus & Reset Sekarang
             </button>
           </DialogFooter>
         </DialogContent>

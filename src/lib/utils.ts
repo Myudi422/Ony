@@ -54,5 +54,6 @@ export const LINK_ICONS: Record<string, string> = {
   website:   '🌐',
   email:     '📧',
   phone:     '📞',
+  maps:      '📍',
   other:     '🔗',
 }

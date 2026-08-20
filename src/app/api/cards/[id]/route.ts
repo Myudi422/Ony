@@ -103,3 +103,58 @@ export async function PATCH(
   const updatedCard = Array.isArray(data) ? data[0] : data
   return NextResponse.json(updatedCard ?? { id, ...update })
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const userId = getUserId(token as Record<string, unknown> | null)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Find card by ID
+  const { data: card, error: fetchErr } = await supabaseAdmin
+    .from('cards')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchErr || !card) {
+    return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+  }
+
+  // Ensure card belongs to current user
+  if (card.user_id !== userId) {
+    return NextResponse.json({ error: 'Forbidden: You do not own this card' }, { status: 403 })
+  }
+
+  // 1. Delete all links associated with this card
+  await supabaseAdmin.from('links').delete().eq('card_id', card.id)
+
+  // 2. Delete all tap logs associated with this card
+  await supabaseAdmin.from('tap_logs').delete().eq('card_id', card.id)
+
+  // 3. Delete link_click_logs if table exists
+  await supabaseAdmin.from('link_click_logs').delete().eq('card_id', card.id)
+
+  // 4. Reset card to fresh unclaimed state
+  const { error: updateErr } = await supabaseAdmin
+    .from('cards')
+    .update({
+      user_id: null,
+      status: 'unclaimed',
+      card_name: 'Media Ony NFC',
+      mode: 'profile',
+      redirect_url: null,
+      total_taps: 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', card.id)
+
+  if (updateErr) {
+    return NextResponse.json({ error: updateErr.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, message: 'Kartu berhasil dihapus dan di-reset.' })
+}
