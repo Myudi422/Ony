@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
 import { Suspense, useState, useEffect } from 'react'
-import { loginWithGoogleFirebase } from '@/lib/firebase'
+import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
 
 function LoginForm() {
   const { data: session, status } = useSession()
@@ -51,7 +51,55 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // Handle already authenticated state — perform claim if code exists then do hard navigation
+  // 1. Check Firebase Google Redirect Result on page mount (essential for mobile browsers)
+  useEffect(() => {
+    let mounted = true
+    async function processRedirectResult() {
+      try {
+        const fbUser = await checkGoogleRedirectResult()
+        if (fbUser && mounted) {
+          setLoading(true)
+          const res = await signIn('firebase', {
+            email: fbUser.email,
+            name: fbUser.name,
+            image: fbUser.photoURL,
+            uid: fbUser.uid,
+            redirect: false,
+            callbackUrl,
+          })
+
+          if (res?.error) {
+            setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
+            setLoading(false)
+            return
+          }
+
+          if (claimCode) {
+            try {
+              await fetch('/api/cards/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: claimCode }),
+              })
+            } catch (_) {}
+          }
+
+          window.location.href = callbackUrl
+        }
+      } catch (err: any) {
+        console.error('Redirect result error:', err)
+        if (mounted) setErrorMsg('Gagal memproses login Google.')
+      }
+    }
+
+    processRedirectResult()
+
+    return () => {
+      mounted = false
+    }
+  }, [callbackUrl, claimCode])
+
+  // 2. Handle already authenticated state — perform claim if code exists then do hard navigation
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       if (claimCode) {
@@ -71,43 +119,53 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setLoading(true)
     setErrorMsg(null)
+
+    const isMobileDevice = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
     try {
-      // 1. Firebase Google Auth Popup
-      const fbUser = await loginWithGoogleFirebase()
-
-      // 2. NextAuth Credentials login via Firebase user details
-      const res = await signIn('firebase', {
-        email: fbUser.email,
-        name: fbUser.name,
-        image: fbUser.photoURL,
-        uid: fbUser.uid,
-        redirect: false,
-        callbackUrl,
-      })
-
-      if (res?.error) {
-        setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
-        setLoading(false)
+      if (isMobileDevice) {
+        // Mobile browsers block popups -> use full page redirect
+        await loginWithGoogleRedirect()
         return
       }
 
-      // 3. Handle Claim Card if code is passed
-      if (claimCode) {
-        try {
-          await fetch('/api/cards/claim', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: claimCode }),
-          })
-        } catch (_) {}
-      }
+      // Desktop: try popup first
+      try {
+        const fbUser = await loginWithGoogleFirebase()
+        const res = await signIn('firebase', {
+          email: fbUser.email,
+          name: fbUser.name,
+          image: fbUser.photoURL,
+          uid: fbUser.uid,
+          redirect: false,
+          callbackUrl,
+        })
 
-      // Hard redirect to callbackUrl on current origin (ony.my.id)
-      window.location.href = callbackUrl
+        if (res?.error) {
+          setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
+          setLoading(false)
+          return
+        }
+
+        if (claimCode) {
+          try {
+            await fetch('/api/cards/claim', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: claimCode }),
+            })
+          } catch (_) {}
+        }
+
+        window.location.href = callbackUrl
+      } catch (popupErr: any) {
+        console.warn('Popup login failed/blocked, falling back to redirect:', popupErr)
+        // Fallback to redirect for desktop if popup blocked
+        await loginWithGoogleRedirect()
+      }
     } catch (err: unknown) {
       console.error('Firebase Auth error:', err)
-      // Fallback: if popup fails or is blocked, try NextAuth Google provider directly with relative callback
-      signIn('google', { callbackUrl })
+      setErrorMsg('Gagal membuka halaman login Google. Pastikan popup/redirect tidak diblokir.')
       setLoading(false)
     }
   }
