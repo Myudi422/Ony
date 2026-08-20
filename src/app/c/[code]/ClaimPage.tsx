@@ -87,8 +87,8 @@ export default function ClaimPage({
         setClaimingOwner(false)
         return
       }
-      // Success! Reload page to show active card profile
-      window.location.href = `/c/${code}`
+      // Success! Redirect to dashboard
+      window.location.href = `/dashboard?claimed=${code}`
     } catch (err: any) {
       setClaimOwnerError(err?.message || 'Terjadi kesalahan saat mengklaim kartu.')
       setClaimingOwner(false)

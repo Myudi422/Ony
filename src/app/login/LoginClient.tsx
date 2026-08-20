@@ -74,16 +74,7 @@ function LoginForm() {
             return
           }
 
-          if (claimCode) {
-            try {
-              await fetch('/api/cards/claim', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: claimCode }),
-              })
-            } catch (_) {}
-          }
-
+          // Do hard redirect so session cookie is cleanly set before any API calls
           window.location.href = callbackUrl
         }
       } catch (err: any) {
@@ -97,24 +88,14 @@ function LoginForm() {
     return () => {
       mounted = false
     }
-  }, [callbackUrl, claimCode])
+  }, [callbackUrl])
 
-  // 2. Handle already authenticated state — perform claim if code exists then do hard navigation
+  // 2. Handle already authenticated state
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      if (claimCode) {
-        fetch('/api/cards/claim', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: claimCode }),
-        }).finally(() => {
-          window.location.href = callbackUrl
-        })
-      } else {
-        window.location.href = callbackUrl
-      }
+      window.location.href = callbackUrl
     }
-  }, [status, session, callbackUrl, claimCode])
+  }, [status, session, callbackUrl])
 
   const handleGoogleLogin = async () => {
     setLoading(true)
@@ -145,16 +126,6 @@ function LoginForm() {
           setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
           setLoading(false)
           return
-        }
-
-        if (claimCode) {
-          try {
-            await fetch('/api/cards/claim', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: claimCode }),
-            })
-          } catch (_) {}
         }
 
         window.location.href = callbackUrl
