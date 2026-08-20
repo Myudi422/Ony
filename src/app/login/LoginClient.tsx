@@ -136,7 +136,8 @@ function LoginForm() {
         // Browser navigates away — nothing runs after this
       } catch (err: any) {
         localStorage.removeItem('ony_redirect_pending')
-        setErrorMsg('Gagal memulai login Google. Silakan coba lagi.')
+        console.error('Redirect init error:', err)
+        setErrorMsg(`Gagal memulai login Google: ${err?.message || err?.code || 'Error tidak diketahui'}`)
         setLoading(false)
       }
       return

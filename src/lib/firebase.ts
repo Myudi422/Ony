@@ -3,6 +3,7 @@ import {
   initializeAuth,
   getAuth,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -16,17 +17,21 @@ const firebaseConfig = {
 }
 
 function getFirebaseAuth() {
-  if (!getApps().length) {
-    const app = initializeApp(firebaseConfig)
+  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
+  let authInstance
+  try {
     if (typeof window !== 'undefined') {
-      return initializeAuth(app, {
+      authInstance = initializeAuth(app, {
         persistence: browserLocalPersistence,
+        popupRedirectResolver: browserPopupRedirectResolver,
       })
+    } else {
+      authInstance = getAuth(app)
     }
-    return getAuth(app)
+  } catch (_) {
+    authInstance = getAuth(app)
   }
-  const app = getApp()
-  return getAuth(app)
+  return authInstance
 }
 
 export const auth = getFirebaseAuth()
