@@ -62,7 +62,7 @@ function LoginForm() {
 
       // 2. Build absolute callback URL for NextAuth's internal URL parser
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ony.my.id'
-      const absoluteCallback = `${origin}${callbackUrl}`
+      const absoluteCallback = origin + callbackUrl
 
       // 3. Authorize session in NextAuth via Firebase credentials
       const res = await signIn('firebase', {
@@ -70,8 +70,8 @@ function LoginForm() {
         name: fbUser.name,
         image: fbUser.photoURL,
         uid: fbUser.uid,
-        callbackUrl: absoluteCallback,
         redirect: false,
+        callbackUrl: absoluteCallback,
       })
 
       if (res?.error) {
