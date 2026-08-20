@@ -5,8 +5,13 @@ import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
-import { Suspense, useState, useEffect } from 'react'
-import { loginWithGoogleFirebase } from '@/lib/firebase'
+import { Suspense, useState, useEffect, useRef } from 'react'
+import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
+
+function isMobile(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
 
 function LoginForm() {
   const { data: session, status } = useSession()
@@ -15,7 +20,7 @@ function LoginForm() {
   const rawCallback = params.get('callbackUrl')
   const rawClaim = params.get('claim') || params.get('autoClaim')
 
-  // Safely extract target path without triggering Invalid URL errors
+  // Safely extract target path
   let targetPath = '/dashboard'
 
   if (rawCallback && rawCallback !== 'undefined' && rawCallback !== 'null') {
@@ -35,35 +40,75 @@ function LoginForm() {
     targetPath = `/c/${rawClaim}?autoClaim=${rawClaim}`
   }
 
-  if (!targetPath.startsWith('/')) {
-    targetPath = '/' + targetPath
-  }
-
+  if (!targetPath.startsWith('/')) targetPath = '/' + targetPath
   const callbackUrl = targetPath
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const redirectHandled = useRef(false)
 
-  // Redirect if user is ALREADY logged in
+  // Redirect if already logged in
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       window.location.replace(callbackUrl)
     }
   }, [status, session, callbackUrl])
 
-  // Pure Google Popup Handler
+  // Handle Firebase Redirect Result on mobile (runs on page load after redirect back from Google)
+  useEffect(() => {
+    if (redirectHandled.current) return
+    redirectHandled.current = true
+
+    async function handleRedirectResult() {
+      try {
+        const fbUser = await checkGoogleRedirectResult()
+        if (!fbUser) return
+
+        setLoading(true)
+        const res = await signIn('firebase', {
+          email: fbUser.email,
+          name: fbUser.name,
+          image: fbUser.photoURL,
+          uid: fbUser.uid,
+          redirect: false,
+        })
+
+        if (res?.error) {
+          setErrorMsg('Gagal membuat sesi. Silakan coba lagi.')
+          setLoading(false)
+          return
+        }
+
+        window.location.href = callbackUrl
+      } catch (err: any) {
+        console.error('Redirect result error:', err)
+        // Not a redirect flow — silently ignore
+      }
+    }
+
+    handleRedirectResult()
+  }, [callbackUrl])
+
   const handleGoogleLogin = async () => {
     setLoading(true)
     setErrorMsg(null)
 
+    // Mobile: use full-page redirect (popup causes Database is closing/hidden error)
+    if (isMobile()) {
+      try {
+        await loginWithGoogleRedirect()
+        // Page will navigate away — no code runs after this
+      } catch (err: any) {
+        setErrorMsg('Gagal memulai login Google di HP. Silakan coba lagi.')
+        setLoading(false)
+      }
+      return
+    }
+
+    // Desktop: use popup
     try {
-      // 1. Open Firebase Google Popup
       const fbUser = await loginWithGoogleFirebase()
 
-      // 2. Authorize session in NextAuth via Firebase credentials
-      // NOTE: Do NOT pass callbackUrl here — NextAuth's internal URL constructor
-      // throws "Failed to construct 'URL': Invalid URL" on relative paths.
-      // We handle the redirect ourselves after the session is created.
       const res = await signIn('firebase', {
         email: fbUser.email,
         name: fbUser.name,
@@ -78,26 +123,26 @@ function LoginForm() {
         return
       }
 
-      // 4. Immediately redirect to target page
       window.location.href = callbackUrl
     } catch (err: any) {
       console.error('Google Popup error:', err)
       const code = err?.code
       if (code === 'auth/popup-closed-by-user') {
-        setErrorMsg('Login dibatalkan karena jendela pop-up ditutup.')
+        setErrorMsg('Login dibatalkan — jendela pop-up ditutup.')
       } else if (code === 'auth/popup-blocked') {
-        setErrorMsg('Jendela pop-up diblokir oleh browser. Harap izinkan pop-up untuk situs ini.')
+        setErrorMsg('Pop-up diblokir browser. Harap izinkan pop-up untuk situs ini.')
       } else {
-        setErrorMsg(err?.message || 'Gagal login dengan Google Popup.')
+        setErrorMsg(err?.message || 'Gagal login dengan Google.')
       }
       setLoading(false)
     }
   }
 
-  if (status === 'loading') {
+  if (status === 'loading' || (loading && isMobile())) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="animate-spin text-ony-blue" size={32} />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-ony-blue" size={36} />
+        <p className="text-slate-500 text-sm font-semibold">Menghubungkan ke Google...</p>
       </div>
     )
   }
@@ -116,11 +161,9 @@ function LoginForm() {
             <Image src="/logo.png" alt="Ony" width={160} height={48} className="h-11 w-auto rounded object-contain transition-transform group-hover:scale-105" priority />
           </Link>
 
-          {/* Interactive Ony NFC Card Preview */}
           <div className="mb-12 relative w-72 h-44">
             <div className="nfc-ring w-52 h-52 -top-4 -left-4 absolute border-blue-400/30" />
             <div className="nfc-ring w-52 h-52 -top-4 -left-4 absolute border-cyan-400/30" />
-
             <div className="relative z-10 w-72 h-44 rounded-2xl p-5 shadow-2xl overflow-hidden animate-float"
               style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', border: '1px solid #334155' }}>
               <div className="absolute inset-0 bg-ony-gradient opacity-20 pointer-events-none" />
@@ -153,7 +196,7 @@ function LoginForm() {
         <div className="relative z-10 space-y-3.5 pt-6 border-t border-slate-100">
           {[
             { icon: Wifi, text: 'NFC + QR Dual Access 1 Media' },
-            { icon: Zap,  text: 'Aktifkan media mandiri dalam 30 detik' },
+            { icon: Zap, text: 'Aktifkan media mandiri dalam 30 detik' },
             { icon: Shield, text: 'Data aman terproteksi Google OAuth' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-slate-700 text-sm font-semibold">
@@ -166,12 +209,11 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Right panel — Login Form Card */}
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-slate-50">
         <div className="w-full max-w-sm">
-          {/* Mobile Logo */}
           <div className="mb-10 lg:hidden flex justify-center">
-            <Link href="/" className="inline-block">
+            <Link href="/">
               <Image src="/logo.png" alt="Ony" width={150} height={44} className="h-10 w-auto rounded object-contain" priority />
             </Link>
           </div>
@@ -205,7 +247,7 @@ function LoginForm() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
             )}
-            {loading ? 'Memproses Sign In...' : 'Lanjutkan dengan Google'}
+            {loading ? 'Memproses...' : 'Lanjutkan dengan Google'}
           </button>
 
           <div className="mt-6 text-center">
