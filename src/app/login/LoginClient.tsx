@@ -8,9 +8,17 @@ import { Wifi, Shield, Zap, Loader2, CreditCard } from 'lucide-react'
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { loginWithGoogleFirebase, loginWithGoogleRedirect, checkGoogleRedirectResult } from '@/lib/firebase'
 
-function isMobile(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+function getBrowserStrategy(): 'popup' | 'redirect' {
+  if (typeof navigator === 'undefined') return 'popup'
+  const ua = navigator.userAgent
+  const isAndroid = /Android/i.test(ua)
+  const isIOS = /iPhone|iPad|iPod/i.test(ua)
+  const isChrome = /Chrome/i.test(ua) && !/Chromium|Edge|OPR/i.test(ua)
+  // Chrome on Android: COOP is disabled on /login, so popup works
+  if (isAndroid && isChrome) return 'popup'
+  // Other mobile browsers (Samsung, Safari, Firefox, in-app): use redirect
+  if (isAndroid || isIOS) return 'redirect'
+  return 'popup'
 }
 
 function LoginForm() {
@@ -93,13 +101,15 @@ function LoginForm() {
     setLoading(true)
     setErrorMsg(null)
 
-    // Mobile: use full-page redirect (popup causes Database is closing/hidden error)
-    if (isMobile()) {
+    const strategy = getBrowserStrategy()
+
+    // Non-Chrome mobile: use full-page redirect (popup is blocked or causes IndexedDB issues)
+    if (strategy === 'redirect') {
       try {
         await loginWithGoogleRedirect()
-        // Page will navigate away — no code runs after this
+        // Browser navigates away — nothing runs after this
       } catch (err: any) {
-        setErrorMsg('Gagal memulai login Google di HP. Silakan coba lagi.')
+        setErrorMsg('Gagal memulai login Google. Silakan coba lagi.')
         setLoading(false)
       }
       return
@@ -138,7 +148,7 @@ function LoginForm() {
     }
   }
 
-  if (status === 'loading' || (loading && isMobile())) {
+  if (status === 'loading' || (loading && getBrowserStrategy() === 'redirect')) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-ony-blue" size={36} />
