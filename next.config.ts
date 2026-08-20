@@ -9,7 +9,21 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    serverActions: { allowedOrigins: ['localhost:3000', 'ony.id'] },
+    serverActions: { allowedOrigins: ['localhost:3000', 'ony.id', 'ony.my.id'] },
+  },
+  async headers() {
+    return [
+      {
+        // Firebase signInWithPopup requires Cross-Origin-Opener-Policy to be
+        // "unsafe-none" on the login page so it can communicate with the Google
+        // OAuth popup window. The default Next.js "same-origin" policy blocks it.
+        source: '/login',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'unsafe-none' },
+        ],
+      },
+    ]
   },
 }
 

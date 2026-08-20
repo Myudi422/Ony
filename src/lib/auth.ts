@@ -69,26 +69,21 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Guard: return relative paths immediately
-      if (url.startsWith('/')) return url
+      // next-auth client calls `new URL(data.url)` on whatever we return here.
+      // So we MUST return an absolute URL, or the client will throw
+      // "Failed to construct 'URL': Invalid URL".
 
-      // Guard: only attempt URL parsing on valid-looking URLs
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        return '/dashboard'
+      // If already absolute, return as-is
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url
       }
 
-      try {
-        const u = new URL(url)
-        // Same host → return relative path to avoid cross-domain issues
-        const base = new URL(baseUrl)
-        if (u.hostname === base.hostname) {
-          return `${u.pathname}${u.search}`
-        }
-        // Different host (e.g. ony-nfc.vercel.app vs ony.my.id) → still strip to path only
-        return `${u.pathname}${u.search}`
-      } catch (_) {}
+      // Relative path → make it absolute using baseUrl
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`
+      }
 
-      return '/dashboard'
+      return baseUrl
     },
     async signIn({ user }) {
       if (!user.email) return false
