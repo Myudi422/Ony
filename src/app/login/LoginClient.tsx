@@ -15,8 +15,7 @@ function LoginForm() {
   const rawCallback = params.get('callbackUrl')
   let claimCode = params.get('claim') || params.get('autoClaim')
 
-  // Always force callbackUrl to be a relative path (e.g. /dashboard or /c/CODE?autoClaim=CODE)
-  // to avoid cross-domain cookie loss between ony.my.id and ony-nfc.vercel.app
+  // Always force callbackUrl to be a relative path on current host (e.g. /dashboard or /c/CODE?autoClaim=CODE)
   let relativeCallback = '/dashboard'
 
   if (rawCallback) {
@@ -51,7 +50,14 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // 1. Check Firebase Google Redirect Result on page mount (essential for mobile browsers)
+  // 1. If user is ALREADY authenticated, immediately redirect away from /login
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      window.location.replace(callbackUrl)
+    }
+  }, [status, session, callbackUrl])
+
+  // 2. Check Firebase Google Redirect Result on page mount (for mobile redirect flow)
   useEffect(() => {
     let mounted = true
     async function processRedirectResult() {
@@ -59,84 +65,72 @@ function LoginForm() {
         const fbUser = await checkGoogleRedirectResult()
         if (fbUser && mounted) {
           setLoading(true)
-          const res = await signIn('firebase', {
+          // Use NextAuth native redirect to ensure cookies & navigation trigger automatically
+          await signIn('firebase', {
             email: fbUser.email,
             name: fbUser.name,
             image: fbUser.photoURL,
             uid: fbUser.uid,
-            redirect: false,
             callbackUrl,
           })
-
-          if (res?.error) {
-            setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
-            setLoading(false)
-            return
-          }
-
-          // Do hard redirect so session cookie is cleanly set before any API calls
-          window.location.href = callbackUrl
         }
       } catch (err: any) {
         console.error('Redirect result error:', err)
-        if (mounted) setErrorMsg('Gagal memproses login Google.')
+        if (mounted) {
+          setErrorMsg('Gagal memproses login Google.')
+          setLoading(false)
+        }
       }
     }
 
-    processRedirectResult()
+    if (status === 'unauthenticated') {
+      processRedirectResult()
+    }
 
     return () => {
       mounted = false
     }
-  }, [callbackUrl])
-
-  // 2. Handle already authenticated state
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      window.location.href = callbackUrl
-    }
-  }, [status, session, callbackUrl])
+  }, [status, callbackUrl])
 
   const handleGoogleLogin = async () => {
     setLoading(true)
     setErrorMsg(null)
 
+    // Try NextAuth native Google Provider first if available
+    try {
+      const res = await signIn('google', { callbackUrl, redirect: false })
+      if (res?.url && !res.error) {
+        window.location.href = res.url
+        return
+      }
+    } catch (_) {}
+
+    // Fallback: Use Firebase Auth
     const isMobileDevice = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 
     try {
       if (isMobileDevice) {
-        // Mobile browsers block popups -> use full page redirect
         await loginWithGoogleRedirect()
         return
       }
 
-      // Desktop: try popup first
+      // Desktop: Popup flow
       try {
         const fbUser = await loginWithGoogleFirebase()
-        const res = await signIn('firebase', {
+        await signIn('firebase', {
           email: fbUser.email,
           name: fbUser.name,
           image: fbUser.photoURL,
           uid: fbUser.uid,
-          redirect: false,
           callbackUrl,
         })
-
-        if (res?.error) {
-          setErrorMsg('Gagal masuk ke sistem. Silakan coba lagi.')
-          setLoading(false)
-          return
-        }
-
-        window.location.href = callbackUrl
       } catch (popupErr: any) {
-        console.warn('Popup login failed/blocked, falling back to redirect:', popupErr)
-        // Fallback to redirect for desktop if popup blocked
+        console.warn('Popup login failed, trying redirect:', popupErr)
         await loginWithGoogleRedirect()
       }
     } catch (err: unknown) {
       console.error('Firebase Auth error:', err)
-      setErrorMsg('Gagal membuka halaman login Google. Pastikan popup/redirect tidak diblokir.')
+      setErrorMsg('Gagal membuka login Google. Silakan coba lagi.')
       setLoading(false)
     }
   }
