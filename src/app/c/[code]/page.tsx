@@ -31,54 +31,50 @@ export default async function CardPage({ params, searchParams }: Props) {
   const { code } = await params
   const { method } = await searchParams
 
+  // Optimized query: Select only required fields
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('*, users(id, name, email, avatar_url)')
+    .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
     .eq('activation_code', code.toUpperCase())
     .single()
 
   if (!card) return notFound()
 
-  // Log tap (fire-and-forget via fetch to avoid blocking render)
+  // Non-blocking telemetry (Fire-and-Forget)
+  // Extracts headers without delaying the HTTP redirect response
   const headersList = await headers()
-  const ua = headersList.get('user-agent') ?? ''
-  const ip = headersList.get('x-forwarded-for')?.split(',')[0] ?? ''
+  const ua = headersList.get('user-agent') ?? 'Browser'
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
+  const accessMethod = method === 'qr' ? 'qr_scan' : 'nfc_tap'
 
-  // Non-blocking tap log with robust fallback
-  try {
-    const logPayload: Record<string, unknown> = {
-      card_id: card.id,
-      access_method: method === 'qr' ? 'qr_scan' : 'nfc_tap',
-      ip_address: ip || '127.0.0.1',
-      user_agent: ua || 'Browser',
-      tapped_at: new Date().toISOString(),
-    }
-    if (card.user_id) logPayload.user_id = card.user_id
-
-    let { error: insertError } = await supabaseAdmin.from('tap_logs').insert(logPayload)
-
-    // Fallback 1: Retry without user_id
-    if (insertError) {
-      delete logPayload.user_id
-      const retry1 = await supabaseAdmin.from('tap_logs').insert(logPayload)
-      insertError = retry1.error
-    }
-
-    // Fallback 2: Retry with minimal payload
-    if (insertError) {
-      await supabaseAdmin.from('tap_logs').insert({
-        card_id: card.id,
-        access_method: method === 'qr' ? 'qr_scan' : 'nfc_tap',
-        tapped_at: new Date().toISOString(),
+  // Fire-and-forget telemetry (runs in background, zero delay for user)
+  void (async () => {
+    try {
+      const { error: rpcErr } = await supabaseAdmin.rpc('log_card_tap', {
+        p_card_id: card.id,
+        p_access_method: accessMethod,
+        p_ip: ip,
+        p_ua: ua,
+        p_user_id: card.user_id || null,
       })
-    }
 
-    // Update total_taps on card record
-    const currentTaps = typeof card.total_taps === 'number' ? card.total_taps : 0
-    await supabaseAdmin.from('cards').update({ total_taps: currentTaps + 1 }).eq('id', card.id)
-  } catch (err) {
-    console.error('Tap logging error:', err)
-  }
+      if (rpcErr) {
+        // Direct fallback logging
+        await supabaseAdmin.from('tap_logs').insert({
+          card_id: card.id,
+          access_method: accessMethod,
+          ip_address: ip,
+          user_agent: ua,
+          tapped_at: new Date().toISOString(),
+          ...(card.user_id ? { user_id: card.user_id } : {}),
+        })
+        const currentTaps = typeof card.total_taps === 'number' ? card.total_taps : 0
+        await supabaseAdmin.from('cards').update({ total_taps: currentTaps + 1 }).eq('id', card.id)
+      }
+    } catch (err) {
+      console.error('Async tap logging background error:', err)
+    }
+  })()
 
   // Suspended / Lost
   if (card.status === 'suspended') {
@@ -111,35 +107,22 @@ export default async function CardPage({ params, searchParams }: Props) {
     return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
 
-  // Active — Direct Mode or Google Review Maps Mode
+  // Active — Direct Mode or Google Review Maps Mode (INSTANT REDIRECT)
   if ((card.mode === 'direct' || card.mode === 'review' || card.mode === 'google_review') && card.redirect_url) {
     redirect(card.redirect_url)
   }
 
   // Active — Profile Mode
-  const user = card.users as { id: string; name: string; email: string; avatar_url: string } | null
+  const user = (Array.isArray(card.users) ? card.users[0] : card.users) as { id: string; name: string; email: string; avatar_url: string } | null
   if (!user) return notFound()
 
-  // Fetch links for this card with multi-tier fail-safe strategy
-  let rawLinks: Record<string, unknown>[] = []
-
-  // 1. Try querying by user_id
-  if (user?.id) {
-    const q1 = await supabaseAdmin.from('links').select('*').eq('user_id', user.id).eq('is_active', true)
-    if (q1.data && q1.data.length > 0) rawLinks = q1.data
-  }
-
-  // 2. Try querying by card_id if still empty
-  if (rawLinks.length === 0 && card?.id) {
-    const q2 = await supabaseAdmin.from('links').select('*').eq('card_id', card.id).eq('is_active', true)
-    if (q2.data && q2.data.length > 0) rawLinks = q2.data
-  }
-
-  // 3. Fallback: fetch active links
-  if (rawLinks.length === 0) {
-    const q3 = await supabaseAdmin.from('links').select('*').eq('is_active', true)
-    if (q3.data && q3.data.length > 0) rawLinks = q3.data
-  }
+  // Efficient single query for active links
+  const { data: rawLinks } = await supabaseAdmin
+    .from('links')
+    .select('*')
+    .or(`user_id.eq.${user.id},card_id.eq.${card.id}`)
+    .eq('is_active', true)
+    .order('order_index', { ascending: true })
 
   const links = (rawLinks ?? []).map((l: any) => {
     const u = String(l.url ?? '').toLowerCase()

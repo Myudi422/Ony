@@ -23,6 +23,13 @@ const nextConfig: NextConfig = {
           { key: 'Cross-Origin-Embedder-Policy', value: 'unsafe-none' },
         ],
       },
+      {
+        // High-throughput Edge CDN Caching for redirect endpoints
+        source: '/c/:code*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=30, stale-while-revalidate=120' },
+        ],
+      },
     ]
   },
 }
