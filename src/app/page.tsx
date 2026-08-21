@@ -7,8 +7,8 @@ import {
   Wifi, Zap, BarChart2, Layers, QrCode, ShoppingBag,
   ArrowRight, Check, Menu, X, ChevronRight, Star, Shield,
   Globe, Download, CreditCard, Tag, Tv, Key,
-  MessageCircle, Instagram, Linkedin, AlertCircle, XCircle, CheckCircle,
-  Briefcase, Store, UserCheck, TrendingUp, Sparkles, Building
+  MessageCircle, Instagram, Linkedin, XCircle, CheckCircle,
+  Briefcase, Store, UserCheck, TrendingUp, Sparkles, Building, MapPin, ExternalLink
 } from 'lucide-react'
 
 import { useSession } from 'next-auth/react'
@@ -40,10 +40,10 @@ function Navbar() {
         {/* Desktop Nav Items */}
         <div className="hidden md:flex items-center gap-8">
           {[
-            ['Solusi Niche', '#problem-solution'],
             ['Cara Kerja', '#how-it-works'],
             ['Fitur', '#features'],
-            ['Produk', '#products'],
+            ['Ony untuk Siapa', '#use-cases'],
+            ['QR Review', '#qr-review'],
             ['Perbandingan', '#comparison'],
           ].map(([label, href]) => (
             <a key={href} href={href} className="text-slate-600 hover:text-ony-blue text-sm font-semibold transition-colors">
@@ -88,10 +88,10 @@ function Navbar() {
       {mobileOpen && (
         <div className="md:hidden bg-white/95 backdrop-blur-2xl border-b border-slate-200 px-6 py-6 flex flex-col gap-4 shadow-xl animate-fade-up">
           {[
-            ['Solusi Niche', '#problem-solution'],
             ['Cara Kerja', '#how-it-works'],
             ['Fitur', '#features'],
-            ['Produk', '#products'],
+            ['Ony untuk Siapa', '#use-cases'],
+            ['QR Review', '#qr-review'],
             ['Perbandingan', '#comparison'],
           ].map(([label, href]) => (
             <a key={href} href={href} onClick={() => setMobileOpen(false)}
@@ -261,39 +261,63 @@ const features = [
   },
 ]
 
-// ─── Physical Products Data ────────────────────────────
-const products = [
+// ─── Dynamic Use Modes ────────────────────────────────
+const USE_MODES = [
   {
-    name: 'NFC Card PVC',
-    icon: CreditCard,
-    desc: 'Kartu bisnis digital fisik PVC premium tahan air dengan Chip NTAG213 dan Kode QR tercetak.',
-    customTag: 'Custom Desain & Cetak Nama',
+    id: 'business-card',
     badge: 'Paling Populer',
-    features: ['Chip NFC NTAG213', 'QR Code tercetak HD', 'Custom nama & logo brand', 'Tahan air & aus'],
+    badgeColor: 'bg-blue-500',
+    icon: CreditCard,
+    accent: 'from-blue-500/10 to-cyan-500/5',
+    border: 'hover:border-blue-300',
+    title: 'NFC Business Card',
+    tagline: 'Identitas Digital Profesional',
+    desc: 'Tap kartu NFC fisik ke HP siapapun — profil, kontak, dan link langsung muncul. Cetak custom nama & logo bisnis kamu.',
+    usedBy: 'Eksekutif, Sales, Networker',
+    features: ['vCard auto-save 1 tap', 'Profil link page custom', 'Update kapan saja tanpa cetak ulang', 'Analytics tap real-time'],
+    cta: 'Pesan NFC Card',
   },
   {
-    name: 'NFC Sticker Smart',
-    icon: Tag,
-    desc: 'Stiker NFC+QR adhesif kuat untuk laptop, hp, notebook, atau packaging produk kamu.',
-    customTag: 'Ukuran & Bentuk Custom',
-    badge: null,
-    features: ['Chip NFC NTAG213', 'QR Code tercetak', 'Adhesif 3M super kuat', 'Waterproof finish'],
+    id: 'review-card',
+    badge: 'Terlaris UMKM',
+    badgeColor: 'bg-amber-500',
+    icon: Star,
+    accent: 'from-amber-500/10 to-orange-500/5',
+    border: 'hover:border-amber-300',
+    title: 'QR Google Review Card',
+    tagline: 'Boost Rating Google Bisnis',
+    desc: 'Input URL Google Maps toko kamu, generate QR khusus review. Cetak di kartu/standee — pelanggan scan, langsung halaman review.',
+    usedBy: 'Kafe, Restoran, Salon, Klinik',
+    features: ['Generate dari URL Maps / Place ID', 'QR langsung ke form review Google', 'Cetak di kartu, standee, atau stiker', 'Bisa dijual kembali ke UMKM lain'],
+    cta: 'Pesan Review Card',
   },
   {
-    name: 'QR Standee Akrilik',
+    id: 'custom-link',
+    badge: 'Multi-Link',
+    badgeColor: 'bg-purple-500',
+    icon: Layers,
+    accent: 'from-purple-500/10 to-violet-500/5',
+    border: 'hover:border-purple-300',
+    title: 'Custom Link Page',
+    tagline: 'Semua Link dalam 1 QR / NFC',
+    desc: 'Tampilkan Instagram, TikTok, WhatsApp, portofolio, dan link apapun dalam satu halaman profil. 1 tap atau scan langsung ke sana.',
+    usedBy: 'Creator, Freelancer, Event Booth',
+    features: ['Drag-drop susun urutan link', 'Direct redirect ke 1 link spesifik', 'Custom warna & foto profil', 'Analitik klik per link'],
+    cta: 'Coba Gratis',
+  },
+  {
+    id: 'qr-standee',
+    badge: 'Toko & Kasir',
+    badgeColor: 'bg-emerald-600',
     icon: Tv,
-    desc: 'Standee akrilik 3mm UV print premium untuk meja kasir, cafe, atau booth pameran.',
-    customTag: 'Bahan Akrilik UV Custom',
-    badge: 'Premium',
-    features: ['Akrilik 3mm UV Print', 'Embedded QR + NFC', 'Base dudukan kokoh', 'Tampilan profesional'],
-  },
-  {
-    name: 'NFC Keychain Epoxy',
-    icon: Key,
-    desc: 'Gantungan kunci ring baja epoxy tangguh. Selalu bawa identitas digitalmu di mana saja.',
-    customTag: 'Custom Desain Ring',
-    badge: null,
-    features: ['Chip NFC NTAG213', 'QR Code di belakang', 'Lapisan Epoxy bening', 'Gantungan baja tahan karat'],
+    accent: 'from-emerald-500/10 to-teal-500/5',
+    border: 'hover:border-emerald-300',
+    title: 'QR Standee Akrilik',
+    tagline: 'Display Meja Premium',
+    desc: 'Standee akrilik UV print 3mm untuk kasir, meja café, atau booth pameran. NFC + QR embedded — tap atau scan untuk akses menu, review, atau promo.',
+    usedBy: 'Cafe, Retail, Event, Co-Working',
+    features: ['Akrilik 3mm UV Print HD', 'NFC + QR embedded', 'Custom desain & ukuran', 'Dudukan kokoh premium'],
+    cta: 'Pesan Standee',
   },
 ]
 
@@ -677,52 +701,78 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Products Section ─────────────────────────── */}
-      <section id="products" className="py-20 md:py-24 bg-slate-50">
+      {/* ── Ony Use Modes / Platform Showcase ──────────── */}
+      <section id="use-cases" className="py-20 md:py-24 bg-slate-50">
         <div className="max-w-6xl mx-auto px-5 sm:px-6">
           <div className="text-center mb-14">
-            <div className="text-ony-blue text-xs font-extrabold uppercase tracking-widest mb-2 font-display">Produk Fisik</div>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-ony-blue text-xs font-extrabold uppercase tracking-wider mb-3 font-display">
+              <Layers size={13} /> Platform Dinamis
+            </div>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-3 tracking-tight font-display">
-              Pilih Media Pintar Favoritmu
+              Satu Media Fisik, <span className="ony-gradient-text font-display">Banyak Fungsi</span>
             </h2>
             <p className="text-slate-600 text-base max-w-xl mx-auto">
-              NFC + QR dalam 1 media fisik. Pilih bentuk sesuai kebutuhan bisnis dan gaya hidupmu.
+              Ony bukan sekadar kartu NFC — ini platform. Kamu bisa atur apa yang terjadi saat seseorang tap atau scan: business card, review Google, link page, atau apapun.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map(({ name, icon: ProductIcon, desc, customTag, badge, features: pf }) => (
-              <div key={name} className="card-surface p-6 hover:border-blue-300 transition-all duration-300 hover:-translate-y-1 relative flex flex-col bg-white">
-                {badge && (
-                  <div className="absolute top-4 right-4 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-ony-gradient text-white shadow-xs tracking-wider font-display">
-                    {badge}
-                  </div>
-                )}
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4 text-ony-blue shrink-0">
-                  <ProductIcon size={24} />
+          <div className="grid sm:grid-cols-2 gap-6 mb-10">
+            {USE_MODES.map(({ id, badge, badgeColor, icon: Icon, accent, border, title, tagline, desc, usedBy, features: mf, cta }) => (
+              <div key={id} className={`card-surface p-6 sm:p-7 bg-white transition-all duration-300 hover:-translate-y-1 relative flex flex-col group shadow-xs ${border}`}>
+                {/* Badge */}
+                <div className={`absolute top-5 right-5 text-[10px] font-extrabold px-2.5 py-1 rounded-full text-white shadow-sm tracking-wider font-display ${badgeColor}`}>
+                  {badge}
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-1.5 font-display">{name}</h3>
-                <p className="text-slate-600 text-xs leading-relaxed mb-4 flex-1">{desc}</p>
-                
+
+                {/* Icon */}
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${accent} border border-slate-200 flex items-center justify-center mb-4 text-slate-700 group-hover:scale-110 transition-transform shrink-0`}>
+                  <Icon size={22} />
+                </div>
+
+                <div className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-1 font-display">{tagline}</div>
+                <h3 className="text-xl font-extrabold text-slate-900 mb-2 font-display">{title}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4 flex-1">{desc}</p>
+
+                <div className="text-[11px] text-slate-500 font-medium mb-3 flex items-center gap-1.5">
+                  <UserCheck size={12} className="shrink-0" /> {usedBy}
+                </div>
+
                 <ul className="space-y-1.5 mb-6">
-                  {pf.map(f => (
+                  {mf.map(f => (
                     <li key={f} className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-                      <Check size={14} className="text-ony-blue shrink-0" />
+                      <Check size={13} className="text-emerald-500 shrink-0" />
                       {f}
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-auto pt-4 border-t border-slate-100">
-                  <div className="text-xs font-bold text-ony-blue bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl mb-3 text-center font-display">
-                    {customTag}
-                  </div>
-                  <Link href="/login" className="btn-primary w-full text-xs py-2.5">
-                    Pesan & Custom
-                  </Link>
-                </div>
+                <a
+                  href="https://shopee.co.id/onynfc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-auto w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                >
+                  {cta} <ExternalLink size={12} />
+                </a>
               </div>
             ))}
+          </div>
+
+          {/* Bottom Shopee Banner */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#EE4D2D]/5 via-orange-50 to-amber-50 border border-orange-200 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div>
+              <div className="text-[#EE4D2D] text-xs font-extrabold uppercase tracking-wider mb-1 font-display">Semua tersedia di Shopee</div>
+              <div className="text-slate-900 font-extrabold text-lg font-display">Custom NFC, QR Review, Standee, & lainnya</div>
+              <p className="text-slate-600 text-sm mt-1">Bebas Ongkir · COD · ShopeePayLater · Garansi Chip 1 Tahun</p>
+            </div>
+            <a
+              href="https://shopee.co.id/onynfc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 flex items-center gap-2 py-3.5 px-7 rounded-2xl bg-[#EE4D2D] hover:bg-[#d63f21] text-white text-sm font-extrabold transition-all shadow-lg active:scale-95"
+            >
+              <ShoppingBag size={17} /> Buka Shopee Ony <ExternalLink size={14} />
+            </a>
           </div>
         </div>
       </section>
@@ -799,8 +849,158 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── QR Google Review Card Section ─────────────── */}
+      <section id="qr-review" className="py-20 md:py-24 bg-white border-t border-slate-200/70">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
+          <div className="grid lg:grid-cols-2 gap-14 items-center">
+
+            {/* Left: Pitch */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-extrabold uppercase tracking-wider mb-4 font-display">
+                <Star size={14} className="fill-amber-500 text-amber-500" /> Produk Add-On Eksklusif
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-4 tracking-tight font-display leading-tight">
+                Kartu QR <span className="ony-gradient-text font-display">Google Review</span> untuk Bisnis Kamu
+              </h2>
+              <p className="text-slate-600 text-base leading-relaxed mb-6">
+                Bantu pelanggan bisnismu beri ulasan Google dalam <strong>1 scan</strong> — tanpa harus cari manual di Maps. Cocok untuk kafe, restoran, salon, klinik, toko retail, dan semua bisnis yang butuh rating Google yang lebih baik.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  {
+                    icon: QrCode,
+                    title: 'Input URL Google Maps Bisnis',
+                    desc: 'Masukkan link Google Maps atau Place ID toko/bisnis, sistem otomatis ekstrak review URL-nya.',
+                    color: 'bg-amber-50 border-amber-200 text-amber-600',
+                  },
+                  {
+                    icon: Zap,
+                    title: 'Generate QR Code Instan',
+                    desc: 'QR Code langsung digenerate dan siap cetak dalam format PNG/PDF resolusi tinggi.',
+                    color: 'bg-blue-50 border-blue-200 text-ony-blue',
+                  },
+                  {
+                    icon: Star,
+                    title: 'Pelanggan Scan → Langsung Review',
+                    desc: 'Scan QR → Google review form terbuka otomatis. Friction 0, konversi rating maks.',
+                    color: 'bg-emerald-50 border-emerald-200 text-emerald-600',
+                  },
+                ].map(({ icon: Icon, title, desc, color }) => (
+                  <div key={title} className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${color}`}>
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <div className="text-slate-900 font-bold text-sm mb-0.5 font-display">{title}</div>
+                      <div className="text-slate-500 text-xs leading-relaxed">{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a
+                  href="https://shopee.co.id/onynfc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary text-sm py-3 px-6 flex items-center gap-2"
+                >
+                  <ShoppingBag size={16} /> Pesan di Shopee <ExternalLink size={13} />
+                </a>
+                <Link href="/login" className="btn-ghost text-sm py-3 px-6">
+                  Coba Generator Gratis
+                </Link>
+              </div>
+            </div>
+
+            {/* Right: Visual demo — mocked QR Review Card */}
+            <div className="flex justify-center">
+              <div className="relative w-full max-w-sm">
+                {/* Decorative glow */}
+                <div className="absolute inset-0 bg-amber-400/10 rounded-[40px] blur-3xl scale-110 pointer-events-none" />
+
+                {/* Card mockup */}
+                <div className="relative bg-white border-2 border-slate-200 rounded-3xl shadow-2xl overflow-hidden">
+                  {/* Top accent */}
+                  <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500" />
+
+                  <div className="p-7 text-center">
+                    {/* Business icon placeholder */}
+                    <div className="w-14 h-14 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center mx-auto mb-3">
+                      <Store size={26} className="text-amber-600" />
+                    </div>
+                    <div className="text-slate-900 font-extrabold text-base mb-0.5 font-display">Kafe Nusantara</div>
+                    <div className="text-slate-500 text-xs mb-5">Jakarta Selatan</div>
+
+                    {/* Fake QR Code visual */}
+                    <div className="w-40 h-40 mx-auto mb-5 rounded-2xl border-2 border-slate-200 bg-white p-2.5 shadow-inner relative overflow-hidden">
+                      <div className="w-full h-full grid grid-cols-7 gap-0.5">
+                        {Array.from({ length: 49 }).map((_, i) => {
+                          const corners = [0,1,2,3,4,5,6,7,13,14,20,21,27,28,34,35,41,42,43,44,45,46,47,48]
+                          const filled = corners.includes(i) || (i % 3 === 0 && i % 7 !== 0) || Math.random() > 0.5
+                          return (
+                            <div
+                              key={i}
+                              className={`rounded-sm ${filled ? 'bg-slate-900' : 'bg-transparent'}`}
+                            />
+                          )
+                        })}
+                      </div>
+                      {/* Center Ony logo mark */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                          <MapPin size={14} className="text-ony-blue" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={14} className="fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                    <p className="text-slate-700 font-bold text-sm mb-1 font-display">Scan untuk Beri Ulasan</p>
+                    <p className="text-slate-400 text-[11px]">Bantu kami dengan ulasan Google kamu!</p>
+
+                    {/* Bottom badge */}
+                    <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-ony-gradient" />
+                      <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">Powered by Ony</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floating badge */}
+                <div className="absolute -top-3 -right-3 bg-emerald-500 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-lg font-display">
+                  Cetak & Jual Kembali
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Use cases strip */}
+          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { icon: Store, label: 'Kafe & Restoran', desc: 'Rating Google naik tanpa minta manual' },
+              { icon: Building, label: 'Klinik & Salon', desc: 'Bangun reputasi lewat ulasan nyata' },
+              { icon: Briefcase, label: 'Jasa & Bengkel', desc: 'Kepercayaan calon pelanggan baru' },
+              { icon: ShoppingBag, label: 'Reseller & Event', desc: 'Jual kembali sebagai produk merch' },
+            ].map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center hover:border-amber-200 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center mx-auto mb-2.5 shadow-xs">
+                  <Icon size={18} className="text-slate-700" />
+                </div>
+                <div className="text-slate-900 font-bold text-xs mb-0.5 font-display">{label}</div>
+                <div className="text-slate-500 text-[11px] leading-relaxed">{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Bottom CTA ───────────────────────────────── */}
-      <section className="py-20 md:py-24 bg-slate-50 border-t border-slate-200/70">
+      <section className="py-20 md:py-24 bg-white border-t border-slate-200/70">
         <div className="max-w-4xl mx-auto px-5 sm:px-6 text-center">
           <div className="card-surface p-8 sm:p-14 relative overflow-hidden bg-white border border-slate-200 shadow-2xl">
             <div className="absolute inset-0 bg-ony-gradient opacity-[0.03] pointer-events-none" />
@@ -821,8 +1021,13 @@ export default function LandingPage() {
                   Mulai Gratis Sekarang
                   <ArrowRight size={16} />
                 </Link>
-                <a href="#products" className="btn-ghost text-sm px-8 py-3.5 font-semibold">
-                  Lihat Katalog Produk
+                <a
+                  href="https://shopee.co.id/onynfc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ghost text-sm px-8 py-3.5 font-semibold flex items-center gap-2"
+                >
+                  Beli di Shopee <ExternalLink size={14} />
                 </a>
               </div>
             </div>
