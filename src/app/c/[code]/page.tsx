@@ -31,10 +31,10 @@ export default async function CardPage({ params, searchParams }: Props) {
   const { code } = await params
   const { method } = await searchParams
 
-  // Optimized query: Select only required fields
+  // Optimized query: Select only existing required fields
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
+    .select('id, activation_code, card_name, mode, redirect_url, status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
     .eq('activation_code', code.toUpperCase())
     .single()
 
@@ -102,7 +102,7 @@ export default async function CardPage({ params, searchParams }: Props) {
   }
 
   // Unclaimed — show claim page
-  const isUnpaidCard = card.payment_status === 'unpaid' || card.redirect_url === 'UNPAID'
+  const isUnpaidCard = card.redirect_url === 'UNPAID'
   if (card.status === 'unclaimed' || !card.user_id) {
     return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
