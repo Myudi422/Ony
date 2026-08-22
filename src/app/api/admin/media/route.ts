@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic'
 
 const checkIsAdmin = (token: Record<string, unknown> | null) => {
   if (!token) return false
-  const adminEmail = (process.env.ADMIN_EMAIL ?? 'myudi422@gmail.com').toLowerCase().trim()
-  if (typeof token.email === 'string' && token.email.toLowerCase().trim() === adminEmail) return true
+  // SECURITY: Never hardcode fallback — if ADMIN_EMAIL is unset, deny access
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim()
+  if (adminEmail && typeof token.email === 'string' && token.email.toLowerCase().trim() === adminEmail) return true
   return token.role === 'admin' || token.role === 'superadmin'
 }
 

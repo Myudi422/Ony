@@ -5,7 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 const isAdminEmail = (email?: string | null) => {
   if (!email) return false
-  const adminEmail = process.env.ADMIN_EMAIL ?? 'myudi422@gmail.com'
+  // SECURITY: Require ADMIN_EMAIL env var — no hardcoded fallback
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (!adminEmail) return false
   return email.toLowerCase().trim() === adminEmail.toLowerCase().trim()
 }
 
