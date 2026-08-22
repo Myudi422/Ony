@@ -20,6 +20,7 @@ import {
 
 interface Card {
   id: string
+  card_number?: number | null
   activation_code: string
   media_type: string
   status: string
@@ -43,15 +44,23 @@ export default function AdminMediaPage() {
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<Stats>({ total: 0, unclaimed: 0, active: 0, suspended: 0, unpaid: 0 })
   const [page, setPage] = useState(1)
-  const [limit] = useState(20)
+  const [limit, setLimit] = useState(20)
   const [loading, setLoading] = useState(false)
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
 
   // Filters State
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterPayment, setFilterPayment] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+
+  // Debounce search 400ms
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [search])
 
   // Batch Generator State
   const [genCount, setGenCount] = useState(2)
@@ -174,28 +183,57 @@ export default function AdminMediaPage() {
     setTimeout(() => setToastMsg(null), 3000)
   }
 
+  // Load paginated cards only (no stats) — for page/sort/limit changes
+  const loadCards = useCallback(async () => {
+    setLoading(true)
+    try {
+      const queryParams = new URLSearchParams({
+        page: String(page), limit: String(limit),
+        search: debouncedSearch.trim(),
+        payment_status: filterPayment, status: filterStatus,
+        start_date: startDate, end_date: endDate,
+        order_by: 'card_number', order_dir: sortDir,
+        skip_stats: 'true',
+      })
+      const d = await fetch(`/api/admin/media?${queryParams}`).then(r => r.json())
+      setCards(d.cards ?? [])
+      setTotal(d.total ?? 0)
+    } catch (_) {}
+    setLoading(false)
+  }, [page, limit, debouncedSearch, filterPayment, filterStatus, startDate, endDate, sortDir])
+
+  // Load stats only — estimated counts, near-instant even on millions of rows
+  const loadStats = useCallback(async () => {
+    try {
+      const d = await fetch('/api/admin/media?stats_only=true').then(r => r.json())
+      if (d.stats) setStats(d.stats)
+    } catch (_) {}
+  }, [])
+
+  // Refresh both cards + stats (after write ops or filter changes)
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const queryParams = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-        search: search.trim(),
-        payment_status: filterPayment,
-        status: filterStatus,
-        start_date: startDate,
-        end_date: endDate,
+        page: String(page), limit: String(limit),
+        search: debouncedSearch.trim(),
+        payment_status: filterPayment, status: filterStatus,
+        start_date: startDate, end_date: endDate,
+        order_by: 'card_number', order_dir: sortDir,
       })
-      const res = await fetch(`/api/admin/media?${queryParams.toString()}`)
-      const d = await res.json()
+      const d = await fetch(`/api/admin/media?${queryParams}`).then(r => r.json())
       setCards(d.cards ?? [])
       setTotal(d.total ?? 0)
       if (d.stats) setStats(d.stats)
     } catch (_) {}
     setLoading(false)
-  }, [page, limit, search, filterPayment, filterStatus, startDate, endDate])
+  }, [page, limit, debouncedSearch, filterPayment, filterStatus, startDate, endDate, sortDir])
 
-  useEffect(() => { load() }, [load])
+  // Initial mount: load cards + stats together
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Page / sort / limit changes: skip stats (lightweight)
+  useEffect(() => { loadCards() }, [loadCards]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetFilters = () => {
     setSearch('')
@@ -238,7 +276,8 @@ export default function AdminMediaPage() {
       if (res.ok && data.cards) {
         setNewCards(data.cards)
         showToast(`✨ Berhasil generate ${data.cards.length} media NFC + QR baru!`)
-        load()
+        loadCards()
+        loadStats()
       } else {
         alert(`Gagal generate media: ${data.error || 'Terjadi kesalahan'}`)
       }
@@ -274,7 +313,8 @@ export default function AdminMediaPage() {
       })
       showToast(`Terhapus ${selectedIds.length} media terpilih.`)
       setSelectedIds([])
-      load()
+      loadCards()
+      loadStats()
     } catch (_) {}
     setDeleting(false)
   }
@@ -307,7 +347,7 @@ export default function AdminMediaPage() {
     const rows = ['Code,NFC_URL,Status,Payment_Option', ...targetList.map(c => {
       const link = `${baseUrl}/c/${c.activation_code}`
       const isUnpaid = c.payment_status === 'unpaid' || c.redirect_url === 'UNPAID'
-      const payOption = isUnpaid ? 'Blangko (Unpaid)' : 'Pre-Paid'
+      const payOption = isUnpaid ? 'BLANK' : 'BAYAR'
       return `${c.activation_code},${link},${c.status},${payOption}`
     })]
     navigator.clipboard.writeText(rows.join('\n'))
@@ -418,7 +458,7 @@ export default function AdminMediaPage() {
         alert(`Gagal unbind: ${data.error}`)
       } else {
         showToast('Kartu berhasil di-unbind.')
-        load()
+        loadCards()
       }
     } catch (err: any) {
       alert(`Gagal unbind: ${err?.message || 'Terjadi kesalahan'}`)
@@ -432,7 +472,7 @@ export default function AdminMediaPage() {
       body: JSON.stringify({ cardId, action: 'status', value: status }),
     })
     showToast(`Status kartu diperbarui ke ${status}.`)
-    load()
+    loadCards()
   }
 
   const exportCSV = () => {
@@ -440,7 +480,7 @@ export default function AdminMediaPage() {
     cards.forEach(c => {
       const link = `${baseUrl}/c/${c.activation_code}`
       const isUnpaid = c.payment_status === 'unpaid' || c.redirect_url === 'UNPAID'
-      const payOption = isUnpaid ? 'Blangko (Unpaid)' : 'Pre-Paid'
+      const payOption = isUnpaid ? 'BLANK' : 'BAYAR'
       rows.push(`${c.activation_code},${link},NFC + QR Media,${payOption},${c.status},${c.users?.email ?? 'unclaimed'},${c.total_taps},${c.created_at}`)
     })
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
@@ -514,7 +554,7 @@ export default function AdminMediaPage() {
                 onChange={e => setPaymentStatus(e.target.value as 'paid' | 'unpaid')}
                 className="input-field cursor-pointer font-medium text-xs text-slate-800"
               >
-                <option value="paid">✓ Pre-Paid (Sudah Beli di Shopee/Tokopedia)</option>
+                <option value="paid">BAYAR (Sudah Beli di Shopee/Tokopedia)</option>
                 <option value="unpaid">💳 Blangko Kosongan (Wajib Bayar saat Klaim)</option>
               </select>
             </div>
@@ -628,7 +668,7 @@ export default function AdminMediaPage() {
                     {nfcUrl}
                   </div>
                   <span className={cn('text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mb-3 uppercase tracking-wider', isUnpaid ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200')}>
-                    {isUnpaid ? '💳 Blangko (Unpaid)' : '✓ Pre-Paid'}
+                    {isUnpaid ? '💳 BLANK' : '✓ BAYAR'}
                   </span>
                   
                   <div className="flex flex-col gap-1.5 w-full mt-auto">
@@ -698,11 +738,11 @@ export default function AdminMediaPage() {
               className="input-field pl-9 pr-8 w-full text-xs font-medium"
               placeholder="Cari kode aktivasi..."
               value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              onChange={e => setSearch(e.target.value)}
             />
             {search && (
               <button
-                onClick={() => { setSearch(''); setPage(1) }}
+                onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(1) }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
               >
                 <X size={14} />
@@ -718,7 +758,7 @@ export default function AdminMediaPage() {
               className="input-field cursor-pointer text-xs font-semibold text-slate-800"
             >
               <option value="all">Semua Pembayaran</option>
-              <option value="paid">✓ Pre-Paid</option>
+              <option value="paid">✓ BAYAR</option>
               <option value="unpaid">💳 Blangko (Unpaid)</option>
             </select>
           </div>
@@ -895,21 +935,12 @@ export default function AdminMediaPage() {
           </div>
         )}
 
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-2 bg-slate-50/50">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-900 text-sm font-display">Daftar Seluruh Media NFC & QR</h3>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-ony-blue font-semibold border border-blue-200">
-              {cards.length} dari {total} Media
+              {cards.length} dari {total}
             </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              onClick={() => selectedIds.length > 0 ? setSelectedIds([]) : toggleSelectAll()}
-              className="btn-ghost py-1 px-2.5 text-xs border border-slate-200 font-medium"
-            >
-              {selectedIds.length > 0 ? `Batal Pilih (${selectedIds.length})` : 'Pilih Semua (Halaman Ini)'}
-            </button>
           </div>
         </div>
 
@@ -925,6 +956,13 @@ export default function AdminMediaPage() {
                     className="rounded border-slate-300 text-ony-blue focus:ring-ony-blue cursor-pointer"
                   />
                 </th>
+                <th
+                  className="text-left px-3 py-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider w-14 cursor-pointer select-none hover:text-slate-800 transition-colors"
+                  onClick={() => { setSortDir(d => d === 'desc' ? 'asc' : 'desc'); setPage(1) }}
+                  title={sortDir === 'desc' ? 'Urutan: Terbaru → Terlama (klik untuk balik)' : 'Urutan: Terlama → Terbaru (klik untuk balik)'}
+                >
+                  # {sortDir === 'desc' ? '↓' : '↑'}
+                </th>
                 <th className="text-left px-3 py-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider">QR Code</th>
                 <th className="text-left px-4 py-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider">Kode Aktivasi</th>
                 <th className="text-left px-4 py-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider">Opsi Payment</th>
@@ -938,7 +976,7 @@ export default function AdminMediaPage() {
             <tbody className="divide-y divide-slate-100">
               {cards.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-slate-500">
+                  <td colSpan={10} className="text-center py-12 text-slate-500">
                     <div className="max-w-xs mx-auto text-center space-y-2">
                       <QrCode size={36} className="mx-auto text-slate-300" />
                       <p className="font-semibold text-slate-700 text-sm">Tidak ada media ditemukan</p>
@@ -969,6 +1007,14 @@ export default function AdminMediaPage() {
                       />
                     </td>
 
+                    {/* No. Urut */}
+                    <td className="px-3 py-3.5">
+                      {card.card_number != null
+                        ? <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">#{card.card_number}</span>
+                        : <span className="text-[11px] text-slate-300">–</span>
+                      }
+                    </td>
+
                     {/* QR Code thumbnail */}
                     <td className="px-3 py-3.5">
                       <button
@@ -996,12 +1042,11 @@ export default function AdminMediaPage() {
                     </td>
 
                     {/* Opsi Payment */}
-                    <td className="px-4 py-3.5">
-                      <span className={cn('text-[11px] px-2.5 py-0.5 rounded-full font-bold border inline-flex items-center gap-1',
-                        isUnpaid ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      )}>
-                        {isUnpaid ? '💳 Blangko (Unpaid)' : '✓ Pre-Paid'}
-                      </span>
+                    <td className="px-4 py-3.5 text-center">
+                      {isUnpaid
+                        ? <X size={15} className="text-rose-500 mx-auto" title="BLANK (belum bayar)" />
+                        : <Check size={15} className="text-emerald-600 mx-auto" title="BAYAR" />
+                      }
                     </td>
 
                     {/* Status */}
@@ -1035,26 +1080,11 @@ export default function AdminMediaPage() {
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => copyToClipboard(nfcUrl, card.activation_code)}
-                          className="flex items-center gap-1 text-[11px] text-slate-700 border border-slate-200 hover:bg-slate-100 px-2.5 py-1 rounded-lg transition-all font-medium"
-                          title="Salin URL Link NFC"
-                        >
-                          {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                          {isCopied ? 'Tersalin' : 'Link'}
-                        </button>
-                        <button
-                          onClick={() => setPreviewCard(card)}
-                          className="flex items-center gap-1 text-[11px] text-ony-blue border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-all font-medium"
-                          title="Preview QR & Link"
-                        >
-                          <Eye size={12} /> QR
-                        </button>
-                        <button
                           onClick={() => handleOpenMockupModal(card)}
                           className="flex items-center gap-1 text-[11px] text-amber-900 bg-amber-50 border border-amber-300 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-all font-bold cursor-pointer"
                           title="Preview & Download Mockup Print (3.4 x 2.1 inc)"
                         >
-                          <CreditCard size={12} /> Mockup Print
+                          <CreditCard size={12} /> Mockup
                         </button>
                         {(card.users || card.status !== 'unclaimed') && (
                           <button
@@ -1091,10 +1121,22 @@ export default function AdminMediaPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 bg-slate-50/50">
-          <span className="text-slate-500 text-xs">
-            Halaman {page} · {total} total media
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500 text-xs">
+              {total === 0 ? 'Tidak ada data' : `${((page - 1) * limit) + 1}–${Math.min(page * limit, total)} dari ${total} media`}
+            </span>
+            <select
+              value={limit}
+              onChange={e => { setLimit(Number(e.target.value)); setPage(1) }}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 font-medium cursor-pointer focus:outline-none focus:ring-1 focus:ring-ony-blue"
+              title="Jumlah item per halaman"
+            >
+              {[10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n} / halaman</option>
+              ))}
+            </select>
+          </div>
           <div className="flex gap-2">
             <button
               disabled={page === 1}
@@ -1103,6 +1145,9 @@ export default function AdminMediaPage() {
             >
               ← Prev
             </button>
+            <span className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold min-w-[60px] text-center">
+              {page} / {Math.max(1, Math.ceil(total / limit))}
+            </span>
             <button
               disabled={page * limit >= total}
               onClick={() => setPage(p => p + 1)}

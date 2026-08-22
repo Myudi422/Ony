@@ -19,61 +19,87 @@ export async function GET(req: NextRequest) {
   }
 
   const searchParams = req.nextUrl.searchParams
-  const page = parseInt(searchParams.get('page') ?? '1')
+  const statsOnly = searchParams.get('stats_only') === 'true'
+  const skipStats = searchParams.get('skip_stats') === 'true'
+
+  // Stats-only mode: return summary counts, skip paginated query
+  if (statsOnly) {
+    const [totalRes, unclaimedRes, activeRes, suspendedRes, unpaidRes] = await Promise.all([
+      supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }),
+      supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'unclaimed'),
+      supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'active'),
+      supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'suspended'),
+      supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('redirect_url', 'UNPAID'),
+    ])
+    return NextResponse.json({
+      stats: {
+        total:     totalRes.count     ?? 0,
+        unclaimed: unclaimedRes.count ?? 0,
+        active:    activeRes.count    ?? 0,
+        suspended: suspendedRes.count ?? 0,
+        unpaid:    unpaidRes.count    ?? 0,
+      }
+    })
+  }
+
+  const page  = parseInt(searchParams.get('page')  ?? '1')
   const limit = parseInt(searchParams.get('limit') ?? '20')
-  const search = searchParams.get('search') ?? ''
+  const search        = searchParams.get('search')         ?? ''
   const paymentStatus = searchParams.get('payment_status') ?? 'all'
-  const cardStatus = searchParams.get('status') ?? 'all'
-  const startDate = searchParams.get('start_date') ?? ''
-  const endDate = searchParams.get('end_date') ?? ''
+  const cardStatus    = searchParams.get('status')         ?? 'all'
+  const startDate     = searchParams.get('start_date')     ?? ''
+  const endDate       = searchParams.get('end_date')       ?? ''
+
+  const allowedOrderBy = ['card_number', 'created_at', 'total_taps'] as const
+  type OrderBy = typeof allowedOrderBy[number]
+  const rawOrderBy = searchParams.get('order_by') ?? 'card_number'
+  const orderBy: OrderBy = allowedOrderBy.includes(rawOrderBy as OrderBy) ? rawOrderBy as OrderBy : 'card_number'
+  const orderAsc = searchParams.get('order_dir') === 'asc'
 
   let query = supabaseAdmin.from('cards').select('*, users(name, email)', { count: 'exact' })
 
   const cleanSearch = search.trim()
-  if (cleanSearch) {
-    query = query.or(`activation_code.ilike.%${cleanSearch}%,card_name.ilike.%${cleanSearch}%`)
-  }
-
-  if (paymentStatus === 'paid') {
-    query = query.or('redirect_url.is.null,redirect_url.neq.UNPAID')
-  } else if (paymentStatus === 'unpaid') {
-    query = query.eq('redirect_url', 'UNPAID')
-  }
-
-  if (cardStatus !== 'all') {
-    query = query.eq('status', cardStatus)
-  }
-
-  if (startDate) {
-    query = query.gte('created_at', `${startDate}T00:00:00.000Z`)
-  }
-
-  if (endDate) {
-    query = query.lte('created_at', `${endDate}T23:59:59.999Z`)
-  }
+  if (cleanSearch) query = query.or(`activation_code.ilike.%${cleanSearch}%,card_name.ilike.%${cleanSearch}%`)
+  if (paymentStatus === 'paid')   query = query.or('redirect_url.is.null,redirect_url.neq.UNPAID')
+  else if (paymentStatus === 'unpaid') query = query.eq('redirect_url', 'UNPAID')
+  if (cardStatus !== 'all') query = query.eq('status', cardStatus)
+  if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`)
+  if (endDate)   query = query.lte('created_at', `${endDate}T23:59:59.999Z`)
 
   const from = (page - 1) * limit
-  const to = from + limit - 1
+  const to   = from + limit - 1
 
+  // Page/sort change only: skip all stat COUNT queries
+  if (skipStats) {
+    const { data, count, error } = await query.range(from, to).order(orderBy, { ascending: orderAsc, nullsFirst: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ cards: data ?? [], total: count ?? 0, page, limit })
+  }
+
+  // Initial load / filter change: run stats in parallel
+  // Stats use count:'estimated' — PostgreSQL planner stats, near-instant on large tables
   const [{ data, count, error }, unclaimedRes, activeRes, suspendedRes, unpaidRes] = await Promise.all([
-    query.range(from, to).order('created_at', { ascending: false }),
-    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'unclaimed'),
-    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('status', 'suspended'),
-    supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('redirect_url', 'UNPAID'),
+    query.range(from, to).order(orderBy, { ascending: orderAsc, nullsFirst: false }),
+    supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'unclaimed'),
+    supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'active'),
+    supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('status', 'suspended'),
+    supabaseAdmin.from('cards').select('*', { count: 'estimated', head: true }).eq('redirect_url', 'UNPAID'),
   ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const stats = {
+  return NextResponse.json({
+    cards: data ?? [],
     total: count ?? 0,
-    unclaimed: unclaimedRes.count ?? 0,
-    active: activeRes.count ?? 0,
-    suspended: suspendedRes.count ?? 0,
-    unpaid: unpaidRes.count ?? 0,
-  }
-
-  return NextResponse.json({ cards: data ?? [], total: count ?? 0, stats, page, limit })
+    stats: {
+      total:     count             ?? 0,
+      unclaimed: unclaimedRes.count ?? 0,
+      active:    activeRes.count    ?? 0,
+      suspended: suspendedRes.count ?? 0,
+      unpaid:    unpaidRes.count    ?? 0,
+    },
+    page, limit,
+  })
 }
 
 export async function POST(req: NextRequest) {
@@ -87,8 +113,35 @@ export async function POST(req: NextRequest) {
   const media_type = body.media_type || 'nfc_qr'
   const payment_status = body.payment_status === 'unpaid' ? 'unpaid' : 'paid'
 
-  const newCards = Array.from({ length: targetCount }, () => ({
-    activation_code: generateActivationCode(8),
+  // Generate unique codes — check against DB to prevent collision on existing printed codes
+  const generatedCodes = new Set<string>()
+  while (generatedCodes.size < targetCount) {
+    generatedCodes.add(generateActivationCode(8))
+  }
+
+  let candidateCodes = Array.from(generatedCodes)
+
+  // Retry loop: check DB for conflicts, regenerate any duplicates
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: existing } = await supabaseAdmin
+      .from('cards')
+      .select('activation_code')
+      .in('activation_code', candidateCodes)
+
+    const takenCodes = new Set((existing ?? []).map((r) => r.activation_code))
+    if (takenCodes.size === 0) break
+
+    candidateCodes = candidateCodes.map((code) => {
+      if (!takenCodes.has(code)) return code
+      let fresh: string
+      do { fresh = generateActivationCode(8) } while (takenCodes.has(fresh) || candidateCodes.includes(fresh))
+      return fresh
+    })
+  }
+
+  const now = new Date().toISOString()
+  const newCards = candidateCodes.map((activation_code) => ({
+    activation_code,
     media_type,
     card_name: `NFC + QR Smart Media`,
     status: 'unclaimed',
@@ -96,8 +149,8 @@ export async function POST(req: NextRequest) {
     payment_status,
     redirect_url: payment_status === 'unpaid' ? 'UNPAID' : null,
     total_taps: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
   }))
 
   let { data, error } = await supabaseAdmin
