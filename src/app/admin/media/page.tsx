@@ -1044,8 +1044,8 @@ export default function AdminMediaPage() {
                     {/* Opsi Payment */}
                     <td className="px-4 py-3.5 text-center">
                       {isUnpaid
-                        ? <X size={15} className="text-rose-500 mx-auto" title="BLANK (belum bayar)" />
-                        : <Check size={15} className="text-emerald-600 mx-auto" title="BAYAR" />
+                        ? <span title="BLANK (belum bayar)"><X size={15} className="text-rose-500 mx-auto" /></span>
+                        : <span title="BAYAR"><Check size={15} className="text-emerald-600 mx-auto" /></span>
                       }
                     </td>
 
