@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronRight, Download, ExternalLink, CreditCard, Tag, Tv, Key, QrCode } from 'lucide-react'
+import { ExternalLink, CreditCard, Tag, Tv, Key, QrCode } from 'lucide-react'
 import { LINK_ICONS } from '@/lib/utils'
 
 const MEDIA_ICONS: Record<string, React.ElementType> = {
@@ -113,32 +113,10 @@ export default function ProfilePage({
           </div>
         )}
 
-        {/* vCard Save Contact CTA */}
-        <button
-          onClick={() => {
-            const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${user.name}\nEMAIL:${user.email}\nNOTE:Profil Ony NFC & QR\nEND:VCARD`
-            const blob = new Blob([vcard], { type: 'text/vcard' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url; a.download = `${user.name.replace(/\s+/g, '_')}.vcf`; a.click()
-            URL.revokeObjectURL(url)
-          }}
-          id="vcard-download-btn"
-          className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-800 hover:text-ony-blue hover:border-blue-300 transition-all text-sm font-bold shadow-xs active:scale-[0.98] mb-6"
-        >
-          <Download size={16} className="text-ony-blue" />
-          Simpan Kontak (vCard)
-        </button>
 
-        {/* Ony Branding Footer */}
-        <div className="text-center pt-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold shadow-xs transition-colors"
-          >
-            <span>Buat Profil Digital Ony Kamu</span>
-            <ChevronRight size={14} className="text-ony-blue" />
-          </Link>
+        {/* Footer */}
+        <div className="text-center pt-2 pb-1">
+          <p className="text-xs text-slate-400">&copy; 2026 Ony</p>
         </div>
       </div>
     </div>

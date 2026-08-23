@@ -116,13 +116,17 @@ export default async function CardPage({ params, searchParams }: Props) {
   const user = (Array.isArray(card.users) ? card.users[0] : card.users) as { id: string; name: string; email: string; avatar_url: string } | null
   if (!user) return notFound()
 
-  // Efficient single query for active links
-  const { data: rawLinks } = await supabaseAdmin
+  // Query links by card_id only (links table has no user_id column)
+  const { data: rawLinks, error: linksError } = await supabaseAdmin
     .from('links')
     .select('*')
-    .or(`user_id.eq.${user.id},card_id.eq.${card.id}`)
-    .eq('is_active', true)
-    .order('order_index', { ascending: true })
+    .eq('card_id', card.id)
+    .neq('is_active', false)
+    .order('created_at', { ascending: true })
+
+  if (linksError) {
+    console.error('Links query error:', linksError.message)
+  }
 
   const links = (rawLinks ?? []).map((l: any) => {
     const u = String(l.url ?? '').toLowerCase()

@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import {
   Plus, Save, ExternalLink, Wifi, Trash2, GripVertical,
   CreditCard, Tag, Tv, Key, QrCode, Globe, MessageCircle,
   Instagram, Linkedin, Youtube, Twitter, Mail, Phone, FileText,
   ShoppingBag, Check, Activity, Eye, RefreshCw, Power, Edit3,
-  AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles
+  AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles, User2, Link2
 } from 'lucide-react'
 import { cn, MEDIA_TYPE_LABELS, STATUS_COLORS, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -62,6 +63,13 @@ const PLATFORM_OPTIONS: Record<string, { label: string; icon: React.ElementType;
   other:     { label: 'Lainnya', icon: Globe, placeholder: 'https://...', defaultTitle: 'Tautan Kustom' },
 }
 
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  avatar_url: string | null
+}
+
 export default function CardsPage() {
   const [cards, setCards] = useState<Card[]>([])
   const [selected, setSelected] = useState<Card | null>(null)
@@ -70,6 +78,11 @@ export default function CardsPage() {
   const [savingCard, setSavingCard] = useState(false)
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'logs'>('editor')
+
+  // User profile editing
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [profileForm, setProfileForm] = useState({ name: '', avatar_url: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
 
   // Pagination for Tap Activity Logs
   const [logsPage, setLogsPage] = useState(1)
@@ -154,6 +167,45 @@ export default function CardsPage() {
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3500)
+  }
+
+  // Fetch user profile
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await fetch('/api/profile')
+      if (res.ok) {
+        const data: UserProfile = await res.json()
+        setUserProfile(data)
+        setProfileForm({ name: data.name ?? '', avatar_url: data.avatar_url ?? '' })
+      }
+    } catch (_) {}
+  }, [])
+
+  useEffect(() => { loadProfile() }, [loadProfile])
+
+  // Save user profile (name + avatar_url)
+  const saveProfile = async () => {
+    setSavingProfile(true)
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileForm.name,
+          avatar_url: profileForm.avatar_url,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.id) {
+        setUserProfile(data)
+        showToast('Profil berhasil diperbarui! Akan tampil di halaman publik.')
+      } else {
+        showToast(data.error || 'Gagal menyimpan profil.', 'error')
+      }
+    } catch (_) {
+      showToast('Terjadi kesalahan koneksi.', 'error')
+    }
+    setSavingProfile(false)
   }
 
   // Fetch user cards
@@ -493,6 +545,68 @@ export default function CardsPage() {
 
               {activeTab === 'editor' ? (
                 <>
+                  {/* Profile Section: Name & Avatar */}
+                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display flex items-center gap-2">
+                      <User2 size={16} className="text-ony-blue" />
+                      Identitas Profil Publik
+                    </h2>
+
+                    <div className="flex items-start gap-4 mb-4">
+                      {/* Avatar Preview */}
+                      <div className="relative shrink-0">
+                        {profileForm.avatar_url ? (
+                          <Image
+                            src={profileForm.avatar_url}
+                            alt={profileForm.name || 'Avatar'}
+                            width={64}
+                            height={64}
+                            className="w-16 h-16 rounded-full object-cover ring-2 ring-blue-100 shadow-md"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md">
+                            {profileForm.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Form Fields */}
+                      <div className="flex-1 min-w-0 space-y-3">
+                        <div>
+                          <label className="text-slate-700 text-xs mb-1.5 block font-semibold">Nama Tampilan</label>
+                          <input
+                            className="input-field text-xs sm:text-sm"
+                            value={profileForm.name}
+                            onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Nama kamu"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-700 text-xs mb-1.5 block font-semibold flex items-center gap-1">
+                            <Link2 size={11} /> URL Foto Profil
+                          </label>
+                          <input
+                            className="input-field text-xs sm:text-sm font-mono"
+                            value={profileForm.avatar_url}
+                            onChange={e => setProfileForm(prev => ({ ...prev, avatar_url: e.target.value }))}
+                            placeholder="https://example.com/photo.jpg"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">Kosongkan untuk menggunakan inisial nama</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={saveProfile}
+                      disabled={savingProfile}
+                      className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-xs font-bold shadow-sm"
+                    >
+                      <Save size={14} />
+                      {savingProfile ? 'Menyimpan...' : 'Simpan Profil'}
+                    </button>
+                  </div>
+
                   {/* Card Settings (Manual Save Only) */}
                   <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display">Informasi & Mode Respons Kartu</h2>

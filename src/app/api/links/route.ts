@@ -49,22 +49,16 @@ export async function GET(req: NextRequest) {
 
   let linksData: Record<string, unknown>[] | null = null
 
-  // 1. Try by user_id
-  if (userId) {
-    const r1 = await supabaseAdmin.from('links').select('*').eq('user_id', userId).order('created_at', { ascending: true })
+  // Query by card_id if provided
+  if (cardId) {
+    const r1 = await supabaseAdmin.from('links').select('*').eq('card_id', cardId).order('created_at', { ascending: true })
     if (r1.data && r1.data.length > 0) linksData = r1.data
   }
 
-  // 2. Try by card_id if empty
-  if ((!linksData || linksData.length === 0) && cardId) {
-    const r2 = await supabaseAdmin.from('links').select('*').eq('card_id', cardId).order('created_at', { ascending: true })
-    if (r2.data && r2.data.length > 0) linksData = r2.data
-  }
-
-  // 3. Fallback: fetch all links
+  // Fallback: fetch all links (for dashboard listing without card_id)
   if (!linksData) {
-    const r3 = await supabaseAdmin.from('links').select('*')
-    linksData = r3.data ?? []
+    const r2 = await supabaseAdmin.from('links').select('*').order('created_at', { ascending: true })
+    linksData = r2.data ?? []
   }
 
   const formatted = linksData.map(formatLinkItem)
@@ -88,14 +82,16 @@ export async function POST(req: NextRequest) {
     url = `https://${url}`
   }
 
+  const icon_type = detectIconType(url, title, body.icon_type || body.platform)
+
   const linkPayload: Record<string, unknown> = {
     title: title.trim(),
     url: url.trim(),
+    icon_type,
     is_active: true,
     created_at: new Date().toISOString(),
   }
 
-  if (userId) linkPayload.user_id = userId
   if (card_id) linkPayload.card_id = card_id
 
   let { data, error } = await supabaseAdmin
@@ -167,6 +163,7 @@ export async function PATCH(req: NextRequest) {
   const updateFields: Record<string, unknown> = {}
   if (typeof is_active === 'boolean') updateFields.is_active = is_active
   if (title) updateFields.title = title.trim()
+  if (body.icon_type) updateFields.icon_type = body.icon_type
   if (url) {
     if (!/^https?:\/\//i.test(url) && !url.startsWith('mailto:') && !url.startsWith('tel:')) {
       url = `https://${url}`

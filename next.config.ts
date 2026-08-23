@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'svsffegiwzdlymixtnfo.supabase.co' },
       { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
     ],
   },
   experimental: {
