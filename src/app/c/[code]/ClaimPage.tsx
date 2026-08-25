@@ -300,6 +300,26 @@ export default function ClaimPage({
     setLoadingPay(false)
   }
 
+  const [checkingStatus, setCheckingStatus] = useState(false)
+
+  const handleCheckPaymentStatus = async () => {
+    setCheckingStatus(true)
+    setPayFormError(null)
+    try {
+      const res = await fetch(`/api/cards/${cardId || code}/check-payment`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.settled) {
+        alert('Pembayaran berhasil terkonfirmasi! Kartu Anda sekarang telah aktif.')
+        window.location.reload()
+      } else {
+        setPayFormError(data.message || 'Pembayaran belum terdeteksi settled. Pastikan Anda sudah menyelesaikan transfer di Cashi.id.')
+      }
+    } catch (_) {
+      setPayFormError('Gagal terhubung ke server untuk mengecek status pembayaran.')
+    }
+    setCheckingStatus(false)
+  }
+
   // Handle auto-generating direct Google write review link from maps URL
   const handleGenerateReviewLink = async (targetInput?: string) => {
     const target = targetInput || googleMapsUrl
@@ -697,15 +717,26 @@ export default function ClaimPage({
                     Memuat sistem pembayaran...
                   </div>
                 ) : (
-                  <button
-                    onClick={handlePayAndClaim}
-                    disabled={loadingPay}
-                    className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-ony-gradient text-white font-extrabold text-sm shadow-xl shadow-blue-500/25 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display cursor-pointer"
-                  >
-                    <ShoppingCart size={18} />
-                    <span>{loadingPay ? 'Memproses Pembayaran...' : `Aktifkan & Bayar Kartu (Rp ${price.toLocaleString('id-ID')})`}</span>
-                    <ArrowRight size={16} className="ml-auto" />
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handlePayAndClaim}
+                      disabled={loadingPay}
+                      className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-ony-gradient text-white font-extrabold text-sm shadow-xl shadow-blue-500/25 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display cursor-pointer"
+                    >
+                      <ShoppingCart size={18} />
+                      <span>{loadingPay ? 'Memproses Pembayaran...' : `Aktifkan & Bayar Kartu (Rp ${price.toLocaleString('id-ID')})`}</span>
+                      <ArrowRight size={16} className="ml-auto" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCheckPaymentStatus}
+                      disabled={checkingStatus}
+                      className="w-full text-center py-2.5 text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <RefreshCw size={13} className={checkingStatus ? 'animate-spin' : ''} />
+                      <span>{checkingStatus ? 'Mengecek status di Cashi.id...' : 'Sudah Bayar? Cek Status Pembayaran di Sini'}</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
