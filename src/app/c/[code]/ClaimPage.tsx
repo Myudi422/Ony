@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   Wifi, ArrowRight, CreditCard, Tag, Tv, Key, ShieldCheck, Zap,
   Link2, ShoppingCart, CheckCircle2, BarChart2, QrCode, RefreshCw, Sparkles,
-  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2
+  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle
 } from 'lucide-react'
 
 const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = {
@@ -349,19 +349,24 @@ export default function ClaimPage({
       desc: 'Bagikan bio, kontak telepon, WhatsApp, sosial media & portofolio hanya dengan 1 tap NFC atau scan QR.',
     },
     {
+      icon: MapPin,
+      title: 'Direct Google Review Maps',
+      desc: 'Dapatkan ulasan bintang 5 lebih cepat. Tap/scan kartu langsung membuka halaman ulasan Google Maps bisnis kamu.',
+    },
+    {
+      icon: Link2,
+      title: 'Custom URL Direct Redirect',
+      desc: 'Arahkan langsung tap/scan kartu ke WhatsApp, Website, Tokopedia, Shopee, atau landing page pilihan kamu.',
+    },
+    {
       icon: RefreshCw,
-      title: 'Update Data Kapan Saja',
-      desc: 'Nomor atau sosmed berubah? Edit langsung dari dashboard tanpa perlu cetak kartu nama fisik baru.',
+      title: 'Bebas Switch Mode & Update Kapan Saja',
+      desc: 'Bebas ubah mode (Profil, Review Maps, atau Direct URL) dan edit data kapan saja via Dashboard tanpa perlu ganti kartu.',
     },
     {
       icon: BarChart2,
       title: 'Laporan Analytics Real-Time',
       desc: 'Pantau statistik interaksi: berapa banyak orang yang tap NFC atau scan QR media kamu setiap hari.',
-    },
-    {
-      icon: QrCode,
-      title: 'QR Studio & Dynamic Link',
-      desc: 'Gunakan QR code dinamis yang bisa dihubungkan ke link website, WhatsApp, atau landing page custom.',
     },
     {
       icon: ShieldCheck,
@@ -380,7 +385,7 @@ export default function ClaimPage({
         <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-cyan-500/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-lg my-6">
+      <div className="relative w-full max-w-lg sm:max-w-xl my-6">
         {/* Header Logo */}
         <div className="text-center mb-6 flex justify-center">
           <Link href="/" className="inline-block transition-transform hover:scale-105">
@@ -424,7 +429,7 @@ export default function ClaimPage({
                   Media Fisik Pintar Serbaguna
                 </div>
                 <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed">
-                  Kartu ini adalah <strong className="text-slate-900">Media Fisik Ony</strong> yang terhubung langsung dengan profil digital kamu. Cukup tap ke HP siapapun tanpa install aplikasi!
+                  Kartu ini adalah <strong className="text-slate-900">Media Fisik Ony</strong>. Bisa difungsikan sebagai <strong className="text-slate-900">Kartu Nama Digital</strong>, <strong className="text-slate-900">Google Review Maps</strong>, atau <strong className="text-slate-900">Direct Redirect URL</strong> cukup dengan 1 tap NFC / scan QR!
                 </p>
               </div>
 
@@ -432,17 +437,17 @@ export default function ClaimPage({
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3 text-left font-display">
                   Apa saja yang bisa dilakukan Ony?
                 </h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {ONY_CAPABILITIES.map(({ icon: Icon, title, desc }) => (
-                    <div key={title} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3.5 text-left transition-all hover:bg-slate-100/60">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-ony-blue mt-0.5 shadow-xs">
-                        <Icon size={18} />
+                    <div key={title} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 text-left transition-all hover:bg-slate-100/60">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-ony-blue mt-0.5 shadow-xs">
+                        <Icon size={16} />
                       </div>
                       <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 font-display flex items-center gap-1.5">
+                        <h4 className="text-xs font-bold text-slate-900 font-display leading-tight">
                           {title}
                         </h4>
-                        <p className="text-slate-600 text-xs leading-relaxed mt-0.5">{desc}</p>
+                        <p className="text-slate-600 text-[11px] leading-relaxed mt-1">{desc}</p>
                       </div>
                     </div>
                   ))}
@@ -474,7 +479,7 @@ export default function ClaimPage({
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-normal">
-                    Aktifkan media kosongan ini untuk langsung menghubungkan profil digital & mulai berbagi kontak secara praktis.
+                    Aktifkan media ini untuk membuka 3 mode utama (Profil Digital, Google Review Maps, Custom Redirect) & bebas atur via Dashboard.
                   </p>
                 </div>
 
@@ -863,14 +868,6 @@ export default function ClaimPage({
                         <span>Aktivasi dengan Google</span>
                         <ArrowRight size={16} className="text-slate-400 ml-auto" />
                       </Link>
-
-                      <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
-                        <Sparkles size={16} className="text-ony-blue shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset Kapan Saja:</strong>
-                          Setelah diklaim, pemilik bebas mengubah mode (Profile, Direct, Review Maps), edit link, atau reset kartu kapan saja via Dashboard.
-                        </div>
-                      </div>
                     </div>
                   )}
 
@@ -1098,6 +1095,20 @@ export default function ClaimPage({
               )}
             </div>
           )}
+        </div>
+
+        {/* Footer Admin WA Contact */}
+        <div className="mt-5 text-center">
+          <a
+            href={`https://wa.me/6289654728249?text=${encodeURIComponent(`Halo Admin Ony, saya membutuhkan bantuan mengenai media dengan kode ${code}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 text-xs font-medium transition-all shadow-xs"
+          >
+            <MessageCircle size={15} className="text-emerald-500 shrink-0" />
+            <span>Kendala atau butuh bantuan?</span>
+            <span className="font-bold text-emerald-600 underline">Hubungi Admin WA</span>
+          </a>
         </div>
       </div>
     </div>
