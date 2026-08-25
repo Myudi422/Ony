@@ -344,34 +344,34 @@ export default function ClaimPage({
 
   const ONY_CAPABILITIES = [
     {
-      icon: CreditCard,
-      title: 'Kartu Nama & Profil Digital',
-      desc: 'Bagikan bio, kontak telepon, WhatsApp, sosial media & portofolio hanya dengan 1 tap NFC atau scan QR.',
+      icon: MapPin,
+      title: '⭐ Direct 5-Star Google Review',
+      desc: 'Pelanggan cukup tap/scan kartu untuk langsung beri ulasan bintang 5 di Google Maps bisnis kamu.',
     },
     {
-      icon: MapPin,
-      title: 'Direct Google Review Maps',
-      desc: 'Dapatkan ulasan bintang 5 lebih cepat. Tap/scan kartu langsung membuka halaman ulasan Google Maps bisnis kamu.',
+      icon: Sparkles,
+      title: 'Auto Review Link Generator',
+      desc: 'Cukup paste link Google Maps bisnis, sistem otomatis ubah jadi link ulasan bintang 5 langsung.',
+    },
+    {
+      icon: CreditCard,
+      title: 'Profil Digital & Business Card',
+      desc: 'Bisa difungsikan sebagai kartu nama digital untuk berbagi kontak WhatsApp, sosmed, & portofolio.',
     },
     {
       icon: Link2,
       title: 'Custom URL Direct Redirect',
-      desc: 'Arahkan langsung tap/scan kartu ke WhatsApp, Website, Tokopedia, Shopee, atau landing page pilihan kamu.',
+      desc: 'Bebas dihubungkan ke link WhatsApp, Website, Instagram, Tokopedia, atau URL apapun.',
     },
     {
       icon: RefreshCw,
-      title: 'Bebas Switch Mode & Update Kapan Saja',
-      desc: 'Bebas ubah mode (Profil, Review Maps, atau Direct URL) dan edit data kapan saja via Dashboard tanpa perlu ganti kartu.',
-    },
-    {
-      icon: BarChart2,
-      title: 'Laporan Analytics Real-Time',
-      desc: 'Pantau statistik interaksi: berapa banyak orang yang tap NFC atau scan QR media kamu setiap hari.',
+      title: 'Bebas Switch Mode & Update Data',
+      desc: 'Bebas ubah mode (Review Maps, Profil, atau Custom Link) kapan saja via Dashboard tanpa ganti kartu.',
     },
     {
       icon: ShieldCheck,
       title: '1x Bayar Masa Aktif Selamanya',
-      desc: 'Tidak ada biaya bulanan atau langganan tersembunyi. Aktifkan sekali dan gunakan media selamanya.',
+      desc: 'Tanpa biaya bulanan atau langganan tersembunyi. Aktifkan sekali untuk pemakaian selamanya.',
     },
   ]
 
@@ -423,13 +423,13 @@ export default function ClaimPage({
           {/* IF UNPAID: Educate on Ony Features & Show Payment */}
           {isUnpaid ? (
             <div className="space-y-6">
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 border border-blue-200/80 text-left">
-                <div className="flex items-center gap-2 text-ony-blue font-bold text-xs uppercase tracking-wider mb-1 font-display">
-                  <Sparkles size={16} className="text-ony-cyan" />
-                  Media Fisik Pintar Serbaguna
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-amber-500/10 border border-amber-200/80 text-left">
+                <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider mb-1 font-display">
+                  <MapPin size={16} className="text-amber-600" />
+                  Media Tap Pintar Google Review
                 </div>
                 <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed">
-                  Kartu ini adalah <strong className="text-slate-900">Media Fisik Ony</strong>. Bisa difungsikan sebagai <strong className="text-slate-900">Kartu Nama Digital</strong>, <strong className="text-slate-900">Google Review Maps</strong>, atau <strong className="text-slate-900">Direct Redirect URL</strong> cukup dengan 1 tap NFC / scan QR!
+                  Solusi cepat memperbanyak ulasan bintang 5 Google Maps bisnis kamu! <strong className="text-slate-900">Cukup 1 tap NFC / scan QR</strong>. Juga bisa difungsikan sebagai Kartu Nama Digital & Direct Redirect URL.
                 </p>
               </div>
 
@@ -479,7 +479,7 @@ export default function ClaimPage({
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-normal">
-                    Aktifkan media ini untuk membuka 3 mode utama (Profil Digital, Google Review Maps, Custom Redirect) & bebas atur via Dashboard.
+                    Aktifkan kartu ini untuk langsung menggunakan mode Google Review Maps (atau Profil Digital & Custom URL) & kelola via Dashboard.
                   </p>
                 </div>
 
@@ -566,19 +566,19 @@ export default function ClaimPage({
                         <div className="grid grid-cols-3 gap-2">
                           {([
                             {
+                              value: 'google_review',
+                              icon: MapPin,
+                              label: 'Google Review',
+                              desc: 'Ulasan Maps ⭐',
+                              color: 'border-amber-400 bg-amber-50 text-amber-700',
+                              inactive: 'border-slate-200 bg-white text-slate-600',
+                            },
+                            {
                               value: 'business_card',
                               icon: CreditCard,
                               label: 'Business Card',
                               desc: 'Profil & bio link',
                               color: 'border-blue-300 bg-blue-50 text-ony-blue',
-                              inactive: 'border-slate-200 bg-white text-slate-600',
-                            },
-                            {
-                              value: 'google_review',
-                              icon: MapPin,
-                              label: 'Google Review',
-                              desc: 'Ulasan Maps',
-                              color: 'border-amber-300 bg-amber-50 text-amber-600',
                               inactive: 'border-slate-200 bg-white text-slate-600',
                             },
                             {
@@ -722,19 +722,19 @@ export default function ClaimPage({
                         <div className="grid grid-cols-3 gap-2">
                           {([
                             {
+                              value: 'google_review',
+                              icon: MapPin,
+                              label: 'Google Review',
+                              desc: 'Ulasan Maps ⭐',
+                              color: 'border-amber-400 bg-amber-50 text-amber-700',
+                              inactive: 'border-slate-200 bg-white text-slate-600',
+                            },
+                            {
                               value: 'business_card',
                               icon: CreditCard,
                               label: 'Business Card',
                               desc: 'Profil & bio link',
                               color: 'border-blue-300 bg-blue-50 text-ony-blue',
-                              inactive: 'border-slate-200 bg-white text-slate-600',
-                            },
-                            {
-                              value: 'google_review',
-                              icon: MapPin,
-                              label: 'Google Review',
-                              desc: 'Ulasan Maps',
-                              color: 'border-amber-300 bg-amber-50 text-amber-600',
                               inactive: 'border-slate-200 bg-white text-slate-600',
                             },
                             {
