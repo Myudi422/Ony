@@ -9,7 +9,7 @@ import {
   ShoppingBag, Check, Activity, Eye, RefreshCw, Power, Edit3,
   AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles, User2, Link2,
   Search, SlidersHorizontal, ChevronLeft, ChevronRight, Zap, BarChart3,
-  Layers, ArrowUpDown
+  Layers, ArrowUpDown, Send
 } from 'lucide-react'
 import { cn, MEDIA_TYPE_LABELS, STATUS_COLORS, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -51,18 +51,18 @@ const MEDIA_ICONS: Record<string, React.ElementType> = {
 }
 
 const PLATFORM_OPTIONS: Record<string, { label: string; icon: React.ElementType; placeholder: string; defaultTitle: string }> = {
-  whatsapp:  { label: 'WhatsApp', icon: MessageCircle, placeholder: 'https://wa.me/628123456789', defaultTitle: 'WhatsApp Saya' },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, placeholder: 'https://wa.me/628123456789', defaultTitle: 'WhatsApp Saya' },
   instagram: { label: 'Instagram', icon: Instagram, placeholder: 'https://instagram.com/username', defaultTitle: 'Instagram Profile' },
-  linkedin:  { label: 'LinkedIn', icon: Linkedin, placeholder: 'https://linkedin.com/in/username', defaultTitle: 'LinkedIn Profile' },
-  youtube:   { label: 'YouTube', icon: Youtube, placeholder: 'https://youtube.com/@channel', defaultTitle: 'Channel YouTube' },
-  twitter:   { label: 'X / Twitter', icon: Twitter, placeholder: 'https://x.com/username', defaultTitle: 'X / Twitter' },
-  maps:      { label: 'Google Maps / Lokasi', icon: MapPin, placeholder: 'https://maps.google.com/?q=-6.200000,106.816666 atau https://goo.gl/maps/...', defaultTitle: 'Lokasi Google Maps' },
-  email:     { label: 'Email', icon: Mail, placeholder: 'mailto:email@domain.com', defaultTitle: 'Kirim Email' },
-  phone:     { label: 'Telepon', icon: Phone, placeholder: 'tel:+628123456789', defaultTitle: 'Telepon' },
-  website:   { label: 'Website', icon: Globe, placeholder: 'https://website.com', defaultTitle: 'Website Utama' },
-  store:     { label: 'Toko Online', icon: ShoppingBag, placeholder: 'https://shopee.co.id/toko', defaultTitle: 'Toko Online' },
-  vcard:     { label: 'vCard', icon: FileText, placeholder: 'Simpan Kontak', defaultTitle: 'Simpan Kontak (vCard)' },
-  other:     { label: 'Lainnya', icon: Globe, placeholder: 'https://...', defaultTitle: 'Tautan Kustom' },
+  linkedin: { label: 'LinkedIn', icon: Linkedin, placeholder: 'https://linkedin.com/in/username', defaultTitle: 'LinkedIn Profile' },
+  youtube: { label: 'YouTube', icon: Youtube, placeholder: 'https://youtube.com/@channel', defaultTitle: 'Channel YouTube' },
+  twitter: { label: 'X / Twitter', icon: Twitter, placeholder: 'https://x.com/username', defaultTitle: 'X / Twitter' },
+  maps: { label: 'Google Maps / Lokasi', icon: MapPin, placeholder: 'https://maps.google.com/?q=-6.200000,106.816666 atau https://goo.gl/maps/...', defaultTitle: 'Lokasi Google Maps' },
+  email: { label: 'Email', icon: Mail, placeholder: 'mailto:email@domain.com', defaultTitle: 'Kirim Email' },
+  phone: { label: 'Telepon', icon: Phone, placeholder: 'tel:+628123456789', defaultTitle: 'Telepon' },
+  website: { label: 'Website', icon: Globe, placeholder: 'https://website.com', defaultTitle: 'Website Utama' },
+  store: { label: 'Toko Online', icon: ShoppingBag, placeholder: 'https://shopee.co.id/toko', defaultTitle: 'Toko Online' },
+  vcard: { label: 'vCard', icon: FileText, placeholder: 'Simpan Kontak', defaultTitle: 'Simpan Kontak (vCard)' },
+  other: { label: 'Lainnya', icon: Globe, placeholder: 'https://...', defaultTitle: 'Tautan Kustom' },
 }
 
 interface UserProfile {
@@ -112,9 +112,64 @@ export default function CardsPage() {
   const [deletingCard, setDeletingCard] = useState<Card | null>(null)
   const [isDeletingCard, setIsDeletingCard] = useState(false)
 
+  // Transfer Card Modal States
+  const [transferringCard, setTransferringCard] = useState<Card | null>(null)
+  const [transferEmail, setTransferEmail] = useState('')
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3500)
+  }
+
+  // Handle Transfer Card Confirmation
+  const handleTransferCardConfirmed = async () => {
+    if (!transferringCard) return
+    if (!transferEmail.trim()) {
+      setTransferError('Email penerima wajib diisi.')
+      return
+    }
+
+    setIsTransferring(true)
+    setTransferError(null)
+
+    try {
+      const res = await fetch('/api/cards/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_id: transferringCard.id,
+          target_email: transferEmail.trim(),
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        setTransferError(data.error || 'Gagal mentransfer kartu.')
+        setIsTransferring(false)
+        return
+      }
+
+      showToast(data.message || 'Kartu berhasil ditransfer!')
+      const cardName = transferringCard.card_name
+      setTransferringCard(null)
+      setTransferEmail('')
+
+      // Update local card list
+      setCards(prev => {
+        const next = prev.filter(c => c.id !== transferringCard.id)
+        if (selected?.id === transferringCard.id) {
+          setSelected(next.length > 0 ? next[0] : null)
+        }
+        return next
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal terhubung ke server.'
+      setTransferError(msg)
+    }
+    setIsTransferring(false)
   }
 
   // Fetch user profile
@@ -126,7 +181,7 @@ export default function CardsPage() {
         setUserProfile(data)
         setProfileForm({ name: data.name ?? '', avatar_url: data.avatar_url ?? '' })
       }
-    } catch (_) {}
+    } catch (_) { }
   }, [])
 
   useEffect(() => { loadProfile() }, [loadProfile])
@@ -167,7 +222,7 @@ export default function CardsPage() {
           setSelected(data[0])
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }, [selected])
 
   useEffect(() => { loadCards() }, [loadCards])
@@ -221,6 +276,22 @@ export default function CardsPage() {
   const totalTaps = useMemo(() => cards.reduce((sum, c) => sum + (c.total_taps || 0), 0), [cards])
   const activeCardsCount = useMemo(() => cards.filter(c => c.status === 'active' || c.status === 'claimed').length, [cards])
 
+  // Unsaved card setting changes detection
+  const originalCard = useMemo(() => cards.find(c => c.id === selected?.id), [cards, selected?.id])
+
+  const hasUnsavedCardChanges = useMemo(() => {
+    if (!selected || !originalCard) return false
+
+    const normSelMode = (selected.mode === 'review' || selected.mode === 'google_review') ? 'google_review' : (selected.mode || 'profile')
+    const normOrigMode = (originalCard.mode === 'review' || originalCard.mode === 'google_review') ? 'google_review' : (originalCard.mode || 'profile')
+
+    return (
+      selected.card_name !== originalCard.card_name ||
+      normSelMode !== normOrigMode ||
+      (selected.redirect_url ?? '') !== (originalCard.redirect_url ?? '')
+    )
+  }, [selected, originalCard])
+
   // Fetch card details (links & logs) when selected card changes
   const loadCardDetails = useCallback(async () => {
     if (!selected) return
@@ -230,7 +301,7 @@ export default function CardsPage() {
       const linkRes = await fetch(`/api/links?card_id=${selected.id}`)
       const linkData = await linkRes.json()
       if (Array.isArray(linkData)) setLinks(linkData)
-    } catch (_) {}
+    } catch (_) { }
 
     // 2. Fetch today's tap logs for this card
     setLoadingLogs(true)
@@ -241,7 +312,7 @@ export default function CardsPage() {
       if (cardDetail.logs && Array.isArray(cardDetail.logs)) {
         setLogs(cardDetail.logs)
       }
-    } catch (_) {}
+    } catch (_) { }
     setLoadingLogs(false)
   }, [selected])
 
@@ -315,13 +386,34 @@ export default function CardsPage() {
     setSavingCard(true)
 
     try {
+      let finalRedirectUrl = selected.redirect_url
+
+      // Auto convert raw Google Maps URL to direct review link if mode is google_review
+      if (
+        (selected.mode === 'google_review' || selected.mode === 'review') &&
+        selected.redirect_url &&
+        !selected.redirect_url.includes('writereview?placeid=')
+      ) {
+        try {
+          const genRes = await fetch('/api/tools/google-review-generator', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: selected.redirect_url }),
+          })
+          const genData = await genRes.json()
+          if (genData.success && genData.reviewUrl) {
+            finalRedirectUrl = genData.reviewUrl
+          }
+        } catch (_) { }
+      }
+
       const res = await fetch(`/api/cards/${selected.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_name: selected.card_name,
           mode: selected.mode,
-          redirect_url: selected.redirect_url,
+          redirect_url: finalRedirectUrl,
         }),
       })
       const updated = await res.json()
@@ -452,7 +544,7 @@ export default function CardsPage() {
         body: JSON.stringify({ id: link.id, is_active: nextState }),
       })
       showToast(nextState ? 'Link diaktifkan' : 'Link dinonaktifkan')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Delete Link
@@ -466,7 +558,7 @@ export default function CardsPage() {
       })
       setLinks(links.filter(l => l.id !== id))
       showToast('Link telah dihapus')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const safeCards = Array.isArray(cards) ? cards : []
@@ -475,7 +567,7 @@ export default function CardsPage() {
 
   return (
     <div className="max-w-6xl w-full mx-auto text-slate-900 relative min-w-0 space-y-6 pb-12">
-      
+
       {/* Success / Error Floating Toast Notification */}
       {toast && (
         <div className={cn(
@@ -507,14 +599,14 @@ export default function CardsPage() {
         {selected && (
           <button
             onClick={() => {
-              setLinkForm({ title: 'WhatsApp Saya', url: '', icon_type: 'whatsapp' })
-              setModalError(null)
-              setAddingLink(true)
+              setTransferringCard(selected)
+              setTransferEmail('')
+              setTransferError(null)
             }}
-            className="btn-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold shadow-sm self-start md:self-auto shrink-0"
+            className="px-4 py-2.5 rounded-xl bg-ony-gradient text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all self-start md:self-auto shrink-0 cursor-pointer"
           >
-            <Plus size={16} />
-            Tambah Link Baru
+            <Send size={15} />
+            Transfer Kartu
           </button>
         )}
       </div>
@@ -584,11 +676,11 @@ export default function CardsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0 items-start">
-          
+
           {/* Left Sidebar: Scalable Card Search & Paginated Selector List (4 Columns) */}
           <div className="lg:col-span-4 space-y-3.5 min-w-0">
             <div className="card-surface p-3.5 sm:p-4 bg-white border border-slate-200/90 shadow-xs rounded-2xl space-y-3">
-              
+
               <div className="flex items-center justify-between">
                 <div className="text-slate-900 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-display">
                   <SlidersHorizontal size={14} className="text-ony-blue" />
@@ -740,7 +832,7 @@ export default function CardsPage() {
           {/* Right Main Panel: Card Configuration & Management (8 Columns) */}
           {selected && (
             <div className="lg:col-span-8 space-y-6 min-w-0">
-              
+
               {/* Card Editor Header Navigation Tabs */}
               <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
                 <div className="flex flex-wrap gap-2">
@@ -780,67 +872,69 @@ export default function CardsPage() {
 
               {activeTab === 'editor' ? (
                 <>
-                  {/* Profile Section: Name & Avatar */}
-                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display flex items-center gap-2">
-                      <User2 size={16} className="text-ony-blue" />
-                      Identitas Profil Publik
-                    </h2>
+                  {/* Profile Section: Name & Avatar (Only in Profile Mode) */}
+                  {(!selected.mode || selected.mode === 'profile') && (
+                    <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display flex items-center gap-2">
+                        <User2 size={16} className="text-ony-blue" />
+                        Identitas Profil Publik
+                      </h2>
 
-                    <div className="flex items-start gap-4 mb-4">
-                      {/* Avatar Preview */}
-                      <div className="relative shrink-0">
-                        {profileForm.avatar_url ? (
-                          <Image
-                            src={profileForm.avatar_url}
-                            alt={profileForm.name || 'Avatar'}
-                            width={64}
-                            height={64}
-                            className="w-16 h-16 rounded-full object-cover ring-2 ring-blue-100 shadow-md"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md">
-                            {profileForm.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
+                      <div className="flex items-start gap-4 mb-4">
+                        {/* Avatar Preview */}
+                        <div className="relative shrink-0">
+                          {profileForm.avatar_url ? (
+                            <Image
+                              src={profileForm.avatar_url}
+                              alt={profileForm.name || 'Avatar'}
+                              width={64}
+                              height={64}
+                              className="w-16 h-16 rounded-full object-cover ring-2 ring-blue-100 shadow-md"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md">
+                              {profileForm.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Form Fields */}
+                        <div className="flex-1 min-w-0 space-y-3">
+                          <div>
+                            <label className="text-slate-700 text-xs mb-1.5 block font-semibold">Nama Tampilan</label>
+                            <input
+                              className="input-field text-xs sm:text-sm"
+                              value={profileForm.name}
+                              onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="Nama kamu"
+                            />
                           </div>
-                        )}
+                          <div>
+                            <label className="text-slate-700 text-xs mb-1.5 block font-semibold flex items-center gap-1">
+                              <Link2 size={11} /> URL Foto Profil
+                            </label>
+                            <input
+                              className="input-field text-xs sm:text-sm font-mono"
+                              value={profileForm.avatar_url}
+                              onChange={e => setProfileForm(prev => ({ ...prev, avatar_url: e.target.value }))}
+                              placeholder="https://example.com/photo.jpg"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Kosongkan untuk menggunakan inisial nama</p>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Form Fields */}
-                      <div className="flex-1 min-w-0 space-y-3">
-                        <div>
-                          <label className="text-slate-700 text-xs mb-1.5 block font-semibold">Nama Tampilan</label>
-                          <input
-                            className="input-field text-xs sm:text-sm"
-                            value={profileForm.name}
-                            onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Nama kamu"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-700 text-xs mb-1.5 block font-semibold flex items-center gap-1">
-                            <Link2 size={11} /> URL Foto Profil
-                          </label>
-                          <input
-                            className="input-field text-xs sm:text-sm font-mono"
-                            value={profileForm.avatar_url}
-                            onChange={e => setProfileForm(prev => ({ ...prev, avatar_url: e.target.value }))}
-                            placeholder="https://example.com/photo.jpg"
-                          />
-                          <p className="text-[10px] text-slate-400 mt-1">Kosongkan untuk menggunakan inisial nama</p>
-                        </div>
-                      </div>
+                      <button
+                        onClick={saveProfile}
+                        disabled={savingProfile}
+                        className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-xs font-bold shadow-xs cursor-pointer"
+                      >
+                        <Save size={14} />
+                        {savingProfile ? 'Menyimpan...' : 'Simpan Profil'}
+                      </button>
                     </div>
-
-                    <button
-                      onClick={saveProfile}
-                      disabled={savingProfile}
-                      className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-xs font-bold shadow-xs cursor-pointer"
-                    >
-                      <Save size={14} />
-                      {savingProfile ? 'Menyimpan...' : 'Simpan Profil'}
-                    </button>
-                  </div>
+                  )}
 
                   {/* Card Settings */}
                   <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
@@ -867,7 +961,7 @@ export default function CardsPage() {
                             onClick={() => setSelected({ ...selected, mode: 'profile' })}
                             className={cn(
                               'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
-                              selected.mode === 'profile'
+                              (!selected.mode || selected.mode === 'profile')
                                 ? 'bg-white text-ony-blue shadow-xs border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
@@ -909,7 +1003,7 @@ export default function CardsPage() {
                             <span className="flex items-center gap-1.5 font-display">
                               <Star size={14} className="fill-amber-400 text-amber-500" /> Review Maps
                             </span>
-                            <span className="text-[10px] text-slate-500 font-normal">Ulasan Bintang 5 Google</span>
+                            <span className="text-[10px] text-slate-500 font-normal">Ulasan Google Maps</span>
                           </button>
                         </div>
 
@@ -932,13 +1026,17 @@ export default function CardsPage() {
                             <div>
                               <label className="text-amber-900 text-xs font-bold mb-1 flex items-center justify-between">
                                 <span>Target URL Google Maps / Review</span>
-                                <span className="text-[11px] font-normal text-amber-700">⭐ Auto 5-Star Dialog</span>
                               </label>
                               <div className="flex flex-col sm:flex-row gap-2">
                                 <input
                                   className="input-field text-sm bg-white flex-1 font-mono"
                                   value={selected.redirect_url ?? ''}
                                   onChange={e => setSelected({ ...selected, redirect_url: e.target.value })}
+                                  onBlur={() => {
+                                    if (selected.redirect_url && !selected.redirect_url.includes('writereview?placeid=')) {
+                                      handleGenerateReviewLink()
+                                    }
+                                  }}
                                   placeholder="https://maps.app.goo.gl/... atau URL ulasan Google Maps"
                                 />
                                 <button
@@ -948,7 +1046,7 @@ export default function CardsPage() {
                                   className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs cursor-pointer"
                                 >
                                   {generatingReview ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                  {generatingReview ? 'Memproses...' : 'Format Link 5-Star'}
+                                  {generatingReview ? 'Memproses...' : 'Generate'}
                                 </button>
                               </div>
                             </div>
@@ -958,20 +1056,29 @@ export default function CardsPage() {
                               </p>
                             )}
                             <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                              💡 <strong>Tips Review Maps:</strong> Masukkan link Google Maps bisnis kamu, lalu klik <em>Format Link 5-Star</em>. Saat kartu di-tap atau di-scan pelanggan, browser akan langsung membuka dialog beri ulasan 5 bintang secara otomatis!
+                              ✨ <strong>Otomatis Convert:</strong> Cukup paste link Google Maps bisnis kamu (seperti <span className="font-mono text-amber-900">https://maps.app.goo.gl/...</span>). Sistem otomatis mengonversinya jadi link ulasan langsung saat disimpan!
                             </p>
                           </div>
                         )}
                       </div>
 
-                      {/* Explicit Manual Save Button */}
+                      {/* Explicit Manual Save Button: Disabled when unchanged */}
                       <button
                         onClick={saveCardSettings}
-                        disabled={savingCard}
-                        className="btn-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-bold shadow-xs cursor-pointer"
+                        disabled={savingCard || !hasUnsavedCardChanges}
+                        className={cn(
+                          "flex items-center justify-center gap-2 w-full py-3 text-sm font-bold transition-all rounded-xl",
+                          hasUnsavedCardChanges
+                            ? "btn-primary cursor-pointer shadow-sm"
+                            : "bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed opacity-80"
+                        )}
                       >
                         <Save size={16} />
-                        {savingCard ? 'Menyimpan Perubahan...' : 'Simpan Perubahan Kartu'}
+                        {savingCard
+                          ? 'Menyimpan Perubahan...'
+                          : hasUnsavedCardChanges
+                          ? 'Simpan Perubahan Kartu'
+                          : 'Perubahan Kartu Tersimpan'}
                       </button>
 
                       {/* Danger Zone: Unlink / Delete Card */}
@@ -993,109 +1100,126 @@ export default function CardsPage() {
                     </div>
                   </div>
 
-                  {/* Links List */}
-                  <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl">
-                    <div className="flex items-center justify-between mb-5">
-                      <div>
-                        <h2 className="text-base font-bold text-slate-900 font-display">Kelola Link Tautan ({safeLinks.length})</h2>
-                        <p className="text-slate-500 text-xs">Link ini akan muncul pada halaman profil publik kartu ini.</p>
+                  {/* Links List (Only in Profile Mode) */}
+                  {(!selected.mode || selected.mode === 'profile') ? (
+                    <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl">
+                      <div className="flex items-center justify-between mb-5">
+                        <div>
+                          <h2 className="text-base font-bold text-slate-900 font-display">Kelola Link Tautan ({safeLinks.length})</h2>
+                          <p className="text-slate-500 text-xs">Link ini akan muncul pada halaman profil publik kartu ini.</p>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setLinkForm({ title: 'WhatsApp Saya', url: '', icon_type: 'whatsapp' })
+                            setModalError(null)
+                            setAddingLink(true)
+                          }}
+                          className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 font-bold cursor-pointer"
+                        >
+                          <Plus size={14} />
+                          Tambah Link
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setLinkForm({ title: 'WhatsApp Saya', url: '', icon_type: 'whatsapp' })
-                          setModalError(null)
-                          setAddingLink(true)
-                        }}
-                        className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 font-bold cursor-pointer"
-                      >
-                        <Plus size={14} />
-                        Tambah Link
-                      </button>
-                    </div>
+                      <div className="space-y-3">
+                        {safeLinks.map(link => {
+                          const IconConfig = PLATFORM_OPTIONS[link.icon_type] ?? PLATFORM_OPTIONS.other
+                          const IconComp = IconConfig.icon
 
-                    <div className="space-y-3">
-                      {safeLinks.map(link => {
-                        const IconConfig = PLATFORM_OPTIONS[link.icon_type] ?? PLATFORM_OPTIONS.other
-                        const IconComp = IconConfig.icon
-
-                        return (
-                          <div
-                            key={link.id}
-                            className={cn(
-                              'flex items-center gap-3.5 p-3.5 rounded-xl border transition-all',
-                              link.is_active ? 'bg-slate-50 border-slate-200' : 'bg-slate-100/60 border-slate-200 opacity-60'
-                            )}
-                          >
-                            <GripVertical size={16} className="text-slate-400 cursor-grab shrink-0" />
-                            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
-                              <IconComp size={18} className="text-ony-blue" />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="text-slate-900 text-sm font-semibold truncate flex items-center gap-2">
-                                {link.title}
-                                {!link.is_active && (
-                                  <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-normal">Nonaktif</span>
-                                )}
+                          return (
+                            <div
+                              key={link.id}
+                              className={cn(
+                                'flex items-center gap-3.5 p-3.5 rounded-xl border transition-all',
+                                link.is_active ? 'bg-slate-50 border-slate-200' : 'bg-slate-100/60 border-slate-200 opacity-60'
+                              )}
+                            >
+                              <GripVertical size={16} className="text-slate-400 cursor-grab shrink-0" />
+                              <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                                <IconComp size={18} className="text-ony-blue" />
                               </div>
-                              <div className="text-slate-500 text-xs truncate font-mono">{link.url}</div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="text-slate-900 text-sm font-semibold truncate flex items-center gap-2">
+                                  {link.title}
+                                  {!link.is_active && (
+                                    <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-normal">Nonaktif</span>
+                                  )}
+                                </div>
+                                <div className="text-slate-500 text-xs truncate font-mono">{link.url}</div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  onClick={() => toggleLinkActive(link)}
+                                  className={cn(
+                                    'p-1.5 rounded-lg border transition-all text-xs font-semibold cursor-pointer',
+                                    link.is_active
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
+                                  )}
+                                  title={link.is_active ? 'Nonaktifkan link' : 'Aktifkan link'}
+                                >
+                                  <Power size={14} />
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setEditingLink(link)
+                                    setModalError(null)
+                                  }}
+                                  className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
+                                  title="Edit Link"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+
+                                <button
+                                  onClick={() => deleteLink(link.id)}
+                                  className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 transition-all cursor-pointer"
+                                  title="Hapus Link"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
+                          )
+                        })}
 
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                onClick={() => toggleLinkActive(link)}
-                                className={cn(
-                                  'p-1.5 rounded-lg border transition-all text-xs font-semibold cursor-pointer',
-                                  link.is_active
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                    : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
-                                )}
-                                title={link.is_active ? 'Nonaktifkan link' : 'Aktifkan link'}
-                              >
-                                <Power size={14} />
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setEditingLink(link)
-                                  setModalError(null)
-                                }}
-                                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
-                                title="Edit Link"
-                              >
-                                <Edit3 size={14} />
-                              </button>
-
-                              <button
-                                onClick={() => deleteLink(link.id)}
-                                className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 transition-all cursor-pointer"
-                                title="Hapus Link"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                        {safeLinks.length === 0 && (
+                          <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl">
+                            <p className="text-slate-400 text-sm mb-2 font-medium">Belum ada link yang ditambahkan ke kartu ini.</p>
+                            <button
+                              onClick={() => {
+                                setLinkForm({ title: 'WhatsApp Saya', url: '', icon_type: 'whatsapp' })
+                                setModalError(null)
+                                setAddingLink(true)
+                              }}
+                              className="btn-ghost text-xs py-1.5 px-3 border-blue-200 text-ony-blue hover:bg-blue-50 cursor-pointer"
+                            >
+                              + Tambah Link Pertama
+                            </button>
                           </div>
-                        )
-                      })}
-
-                      {safeLinks.length === 0 && (
-                        <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl">
-                          <p className="text-slate-400 text-sm mb-2 font-medium">Belum ada link yang ditambahkan ke kartu ini.</p>
-                          <button
-                            onClick={() => {
-                              setLinkForm({ title: 'WhatsApp Saya', url: '', icon_type: 'whatsapp' })
-                              setModalError(null)
-                              setAddingLink(true)
-                            }}
-                            className="btn-ghost text-xs py-1.5 px-3 border-blue-200 text-ony-blue hover:bg-blue-50 cursor-pointer"
-                          >
-                            + Tambah Link Pertama
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="card-surface p-6 bg-slate-50/80 border border-slate-200/90 shadow-xs rounded-2xl text-center">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-ony-blue flex items-center justify-center mx-auto mb-2.5">
+                        <ExternalLink size={18} />
+                      </div>
+                      <h3 className="text-xs font-bold text-slate-900 font-display mb-1">
+                        Mode Kartu: {selected.mode === 'direct' ? 'Direct Redirect' : 'Google Review Maps'}
+                      </h3>
+                      <p className="text-[11px] text-slate-600 max-w-md mx-auto leading-relaxed">
+                        Saat kartu di-tap atau di-scan, browser akan <strong>langsung mengalihkan pelanggan</strong> ke target URL di atas tanpa menampilkan halaman profil link.
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-2">
+                        Pilih <strong>Profile Mode</strong> di atas jika ingin menampilkan halaman profil berisi daftar link & kontak.
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 /* Today's Tap Activity Logs */
@@ -1374,6 +1498,73 @@ export default function CardsPage() {
             >
               {isDeletingCard ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
               Hapus & Reset Sekarang
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 🔄 DIALOG TRANSFER KARTU                                    */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <Dialog open={!!transferringCard} onOpenChange={open => !open && setTransferringCard(null)}>
+        <DialogContent className="max-w-md bg-white border-slate-200 shadow-xl rounded-2xl p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2 font-display">
+              <Send size={20} className="text-ony-blue" /> Transfer Kepemilikan Kartu
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600 mt-1">
+              Pindahkan kepemilikan kartu <strong className="text-slate-900">{transferringCard?.card_name}</strong> ({transferringCard?.activation_code}) ke akun pengguna Ony lainnya.
+            </DialogDescription>
+          </DialogHeader>
+
+          {transferError && (
+            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+              <AlertCircle size={15} className="shrink-0" />
+              {transferError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-slate-700 text-xs font-semibold mb-1.5 block">Email Pengguna Penerima</label>
+              <input
+                type="email"
+                className="input-field text-xs font-medium"
+                placeholder="nama@domain.com"
+                value={transferEmail}
+                onChange={e => setTransferEmail(e.target.value)}
+              />
+              <p className="text-slate-400 text-[11px] mt-1">
+                Penerima harus sudah terdaftar di platform Ony dengan email ini.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-blue-900 text-xs space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-blue-950">
+                <AlertCircle size={15} className="text-ony-blue shrink-0" /> Ketentuan Transfer:
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-blue-900/80">
+                <li>Kartu ini akan berpindah penuh dari dasbor kamu ke dasbor penerima.</li>
+                <li>Seluruh daftar tautan & konfigurasi mode kartu tetap dipertahankan.</li>
+                <li>Proses transfer instan dan tidak dapat dibatalkan otomatis.</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-row items-center justify-end gap-2.5 mt-6 pt-2 border-t border-slate-100">
+            <button
+              onClick={() => setTransferringCard(null)}
+              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600 cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleTransferCardConfirmed}
+              disabled={isTransferring || !transferEmail.trim()}
+              className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {isTransferring ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+              {isTransferring ? 'Memproses Transfer...' : 'Transfer'}
             </button>
           </DialogFooter>
         </DialogContent>

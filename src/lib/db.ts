@@ -97,13 +97,18 @@ export async function getUserLinks(userId: string, cardId?: string) {
   let query = supabaseAdmin
     .from('links')
     .select('*')
-    .eq('user_id', userId)
     .eq('is_active', true)
-    .order('order_index')
+    .order('created_at', { ascending: true })
 
   if (cardId) {
-    query = query.or(`card_id.eq.${cardId},card_id.is.null`)
+    query = query.eq('card_id', cardId)
+  } else {
+    const { data: cards } = await supabaseAdmin.from('cards').select('id').eq('user_id', userId)
+    const cardIds = (cards ?? []).map(c => c.id)
+    if (cardIds.length === 0) return []
+    query = query.in('card_id', cardIds)
   }
+
   const { data } = await query
   return data ?? []
 }
