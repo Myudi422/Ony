@@ -71,9 +71,19 @@ export async function POST(
         })
 
         const checkData = await checkRes.json().catch(() => ({}))
-        const statusStr = String(checkData?.status || checkData?.data?.status || '').toUpperCase()
+        const statusStr = String(
+          checkData?.status ||
+          checkData?.data?.status ||
+          checkData?.transaction_status ||
+          checkData?.data?.transaction_status ||
+          checkData?.payment_status ||
+          checkData?.data?.payment_status ||
+          ''
+        ).toUpperCase()
 
-        if (checkRes.ok && (statusStr === 'SETTLED' || statusStr === 'PAID' || statusStr === 'SUCCESS')) {
+        const isSettled = ['SETTLED', 'PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'SETTLE'].includes(statusStr)
+
+        if (isSettled) {
           const metadata = tx.customer_details || {}
           const email = metadata?.email
           const purpose = metadata?.purpose || 'google_review'

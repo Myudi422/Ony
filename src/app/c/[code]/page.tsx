@@ -17,11 +17,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('card_name, users(name)')
-    .eq('activation_code', code.toUpperCase())
-    .single()
+    .select('card_name, user_id')
+    .eq('activation_code', code.trim().toUpperCase())
+    .maybeSingle()
 
-  const name = (card?.users as { name?: string } | null)?.name ?? 'Profil Digital'
+  let name = 'Profil Digital'
+  if (card?.user_id) {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('name')
+      .eq('id', card.user_id)
+      .maybeSingle()
+    if (user?.name) name = user.name
+  }
+
   return {
     title: `${name} — Ony`,
     description: `Profil digital ${name} via Ony NFC & QR`,
@@ -32,12 +41,23 @@ export default async function CardPage({ params, searchParams }: Props) {
   const { code } = await params
   const { method } = await searchParams
 
-  // Optimized query: Select only required fields including payment_status
-  const { data: card } = await supabaseAdmin
+  const cleanCode = code.trim().toUpperCase()
+
+  // Safe query: Select cards without embedded join to prevent PostgREST relationship errors
+  let { data: card } = await supabaseAdmin
     .from('cards')
-    .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
-    .eq('activation_code', code.toUpperCase())
-    .single()
+    .select('*')
+    .eq('activation_code', cleanCode)
+    .maybeSingle()
+
+  if (!card) {
+    const { data: fallbackCard } = await supabaseAdmin
+      .from('cards')
+      .select('*')
+      .ilike('activation_code', cleanCode)
+      .maybeSingle()
+    card = fallbackCard
+  }
 
   if (!card) return notFound()
 
@@ -125,9 +145,19 @@ export default async function CardPage({ params, searchParams }: Props) {
           cache: 'no-store',
         })
         const checkData = await checkRes.json().catch(() => ({}))
-        const statusStr = String(checkData?.status || checkData?.data?.status || '').toUpperCase()
+        const statusStr = String(
+          checkData?.status ||
+          checkData?.data?.status ||
+          checkData?.transaction_status ||
+          checkData?.data?.transaction_status ||
+          checkData?.payment_status ||
+          checkData?.data?.payment_status ||
+          ''
+        ).toUpperCase()
 
-        if (checkRes.ok && (statusStr === 'SETTLED' || statusStr === 'PAID' || statusStr === 'SUCCESS')) {
+        const isSettled = ['SETTLED', 'PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'SETTLE'].includes(statusStr)
+
+        if (isSettled) {
           const metadata = latestTx.customer_details || {}
           const email = metadata?.email
           const purpose = metadata?.purpose || 'google_review'
@@ -206,22 +236,31 @@ export default async function CardPage({ params, searchParams }: Props) {
     redirect(targetRedirectUrl)
   }
 
-  // Active Direct Mode / Google Review — INSTANT REDIRECT (regardless of user_id)
-  const isPaidOrHasUrl = card.payment_status === 'paid' || (card.redirect_url && card.redirect_url !== 'UNPAID')
-  const isDirect = card.mode === 'direct' || card.mode === 'review' || card.mode === 'google_review'
-
-  if (isPaidOrHasUrl && isDirect && card.redirect_url && card.redirect_url !== 'UNPAID') {
+  // Active Direct / Google Review / Custom Redirect — INSTANT REDIRECT if valid URL exists
+  if (card.redirect_url && card.redirect_url !== 'UNPAID' && card.redirect_url.startsWith('http')) {
     redirect(card.redirect_url)
   }
 
   // Unclaimed or Unpaid — show claim page
-  if (card.status === 'unclaimed' || isUnpaidCard || (!card.user_id && !isDirect)) {
+  if (card.status === 'unclaimed' || isUnpaidCard || !card.user_id) {
     return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
 
   // Active — Profile Mode
-  const user = (Array.isArray(card.users) ? card.users[0] : card.users) as { id: string; name: string; email: string; avatar_url: string } | null
-  if (!user) return notFound()
+  let user: { id: string; name: string; email: string; avatar_url: string } | null = null
+  if (card.user_id) {
+    const { data: userData } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, avatar_url')
+      .eq('id', card.user_id)
+      .maybeSingle()
+    user = userData
+  }
+
+  if (!user) {
+    // Fallback if profile mode has no linked user record instead of 404
+    return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus="paid" cardId={card.id} />
+  }
 
   // Query links by card_id only (links table has no user_id column)
   const { data: rawLinks, error: linksError } = await supabaseAdmin

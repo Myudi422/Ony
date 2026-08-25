@@ -145,15 +145,12 @@ export async function POST(req: NextRequest) {
         updateData.user_id = targetUserId
       }
 
-      let query = supabaseAdmin.from('cards').update(updateData)
-
       if (cardId) {
-        query = query.eq('id', cardId)
-      } else if (code) {
-        query = query.eq('activation_code', code.toUpperCase())
+        await supabaseAdmin.from('cards').update(updateData).eq('id', cardId)
       }
-
-      await query
+      if (code) {
+        await supabaseAdmin.from('cards').update(updateData).ilike('activation_code', code.trim())
+      }
 
       return NextResponse.json({ ok: true, type: 'card_claim', status: 'SETTLED' })
     }
