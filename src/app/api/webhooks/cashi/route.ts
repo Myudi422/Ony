@@ -3,6 +3,14 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getLivePricing } from '@/lib/pricing'
 import crypto from 'crypto'
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    status: 'online',
+    message: 'Cashi.id Webhook endpoint is active and listening for POST notifications.',
+  })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
