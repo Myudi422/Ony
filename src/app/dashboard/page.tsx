@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight, ShoppingBag } from 'lucide-react'
+import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight, ShoppingBag, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { formatNumber } from '@/lib/utils'
 
@@ -115,10 +115,10 @@ export default function DashboardPage() {
         <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-4 font-display">Aksi Cepat</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 min-w-0">
           {[
-            { href: '/dashboard/cards',     icon: CreditCard, label: 'Edit Profil',    bg: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80' },
-            { href: '/dashboard/analytics', icon: BarChart2,  label: 'Lihat Analytics', bg: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80' },
-            { href: '/dashboard/store',     icon: ShoppingBag, label: 'Toko Shopee',   bg: 'bg-orange-50/70 hover:bg-orange-100/80 border-orange-200/80' },
-            { href: '/dashboard/store',     icon: Wifi,       label: 'TikTok Shop',     bg: 'bg-slate-100/70 hover:bg-slate-200/80 border-slate-300/80' },
+            { href: '/dashboard/cards',     icon: CreditCard,  label: 'Edit Profil',     bg: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80' },
+            { href: '/dashboard/analytics', icon: BarChart2,   label: 'Lihat Analytics',  bg: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80' },
+            { href: '/dashboard/store',     icon: ShoppingBag, label: 'Official Store',   bg: 'bg-orange-50/70 hover:bg-orange-100/80 border-orange-200/80' },
+            { href: '/dashboard/settings',  icon: Settings,    label: 'Pengaturan',      bg: 'bg-slate-100/70 hover:bg-slate-200/80 border-slate-300/80' },
           ].map(({ href, icon: Icon, label, bg }) => (
             <Link key={href} href={href}
               className={`p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center rounded-2xl border transition-all hover:-translate-y-0.5 shadow-xs ${bg}`}>
