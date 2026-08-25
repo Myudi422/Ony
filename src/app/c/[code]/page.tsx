@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getLivePricing } from '@/lib/pricing'
 import type { Metadata } from 'next'
 import ClaimPage from './ClaimPage'
 import ProfilePage from './ProfilePage'
@@ -105,24 +106,26 @@ export default async function CardPage({ params, searchParams }: Props) {
   let isUnpaidCard = card.redirect_url === 'UNPAID'
   if (isUnpaidCard) {
     try {
+      const livePricing = await getLivePricing()
+      const cashiApiKey = livePricing.cashi_api_key || process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
+
       const { data: latestTx } = await supabaseAdmin
         .from('transactions')
         .select('order_id, customer_details, created_at')
-        .filter('order_id', 'ilike', `CARD-CLAIM-${card.activation_code}-%`)
-        .eq('transaction_status', 'pending')
+        .ilike('order_id', `%${card.activation_code}%`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (latestTx?.order_id) {
-        const cashiApiKey = process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
         const checkRes = await fetch(`https://cashi.id/api/check-status/${latestTx.order_id}`, {
           headers: { 'x-api-key': cashiApiKey },
           cache: 'no-store',
         })
-        const checkData = await checkRes.json()
+        const checkData = await checkRes.json().catch(() => ({}))
+        const statusStr = String(checkData?.status || checkData?.data?.status || '').toUpperCase()
 
-        if (checkRes.ok && (checkData.status === 'SETTLED' || checkData.status === 'PAID')) {
+        if (checkRes.ok && (statusStr === 'SETTLED' || statusStr === 'PAID' || statusStr === 'SUCCESS')) {
           const metadata = latestTx.customer_details || {}
           const email = metadata?.email
           const purpose = metadata?.purpose || 'google_review'
