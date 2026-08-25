@@ -2,17 +2,21 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const DEFAULT_PRICING = {
   card_base_price: 49000,
-  card_promo_price: 39000,
-  is_promo_active: false,
+  card_promo_price: 2000,
+  is_promo_active: true,
+  cashi_api_key: process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa',
+  cashi_webhook_secret: process.env.CASHI_WEBHOOK_SECRET || 'sk_b3e73f271e3c0a68fc65168d14920e7b',
 }
+
+export type PricingConfig = typeof DEFAULT_PRICING
 
 declare global {
   // eslint-disable-next-line no-var
-  var __globalPricingCache: { card_base_price: number; card_promo_price: number; is_promo_active: boolean } | undefined
+  var __globalPricingCache: PricingConfig | undefined
 }
 
-export async function getLivePricing() {
-  // 1. Try reading from cards table using '__SYSTEM_PRICING__' key (100% guaranteed DB table)
+export async function getLivePricing(): Promise<PricingConfig> {
+  // 1. Try reading from cards table using '__SYSTEM_PRICING__' key
   try {
     const { data: configCard } = await supabaseAdmin
       .from('cards')
@@ -23,10 +27,12 @@ export async function getLivePricing() {
     if (configCard?.card_name) {
       const parsed = JSON.parse(configCard.card_name)
       if (typeof parsed.card_base_price === 'number') {
-        const pricing = {
+        const pricing: PricingConfig = {
           card_base_price: Number(parsed.card_base_price) || DEFAULT_PRICING.card_base_price,
           card_promo_price: Number(parsed.card_promo_price) || DEFAULT_PRICING.card_promo_price,
           is_promo_active: Boolean(parsed.is_promo_active),
+          cashi_api_key: String(parsed.cashi_api_key || process.env.CASHI_API_KEY || DEFAULT_PRICING.cashi_api_key),
+          cashi_webhook_secret: String(parsed.cashi_webhook_secret || process.env.CASHI_WEBHOOK_SECRET || DEFAULT_PRICING.cashi_webhook_secret),
         }
         globalThis.__globalPricingCache = pricing
         return pricing
@@ -39,7 +45,7 @@ export async function getLivePricing() {
     const { data } = await supabaseAdmin
       .from('system_settings')
       .select('key, value')
-      .in('key', ['card_base_price', 'card_promo_price', 'is_promo_active'])
+      .in('key', ['card_base_price', 'card_promo_price', 'is_promo_active', 'cashi_api_key', 'cashi_webhook_secret'])
 
     if (data && data.length > 0) {
       const pricing: Record<string, unknown> = { ...DEFAULT_PRICING }
@@ -47,9 +53,11 @@ export async function getLivePricing() {
         if (item.key === 'card_base_price') pricing.card_base_price = Number(item.value) || DEFAULT_PRICING.card_base_price
         if (item.key === 'card_promo_price') pricing.card_promo_price = Number(item.value) || DEFAULT_PRICING.card_promo_price
         if (item.key === 'is_promo_active') pricing.is_promo_active = item.value === 'true' || item.value === true
+        if (item.key === 'cashi_api_key') pricing.cashi_api_key = String(item.value)
+        if (item.key === 'cashi_webhook_secret') pricing.cashi_webhook_secret = String(item.value)
       }
-      globalThis.__globalPricingCache = pricing as typeof DEFAULT_PRICING
-      return pricing
+      globalThis.__globalPricingCache = pricing as PricingConfig
+      return pricing as PricingConfig
     }
   } catch (_) {}
 

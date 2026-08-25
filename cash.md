@@ -165,6 +165,6 @@ https://cashi.id/api/check-status/:orderId
 
 
 
-DIMENU ADMIN BIKIN PENGATURAN API KEY DAN WEBHOOK KEY, dan nominal harga produknya di menu /c/ claim nanti
+
 API KEY : 7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa
 WEBHOOK SECRET KEY : sk_b3e73f271e3c0a68fc65168d14920e7b

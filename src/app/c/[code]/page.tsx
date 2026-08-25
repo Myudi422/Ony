@@ -101,8 +101,94 @@ export default async function CardPage({ params, searchParams }: Props) {
     )
   }
 
+  // Fail-safe auto check status from Cashi.id if card is marked UNPAID
+  let isUnpaidCard = card.redirect_url === 'UNPAID'
+  if (isUnpaidCard) {
+    try {
+      const { data: latestTx } = await supabaseAdmin
+        .from('transactions')
+        .select('order_id, customer_details, created_at')
+        .filter('order_id', 'ilike', `CARD-CLAIM-${card.activation_code}-%`)
+        .eq('transaction_status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestTx?.order_id) {
+        const cashiApiKey = process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
+        const checkRes = await fetch(`https://cashi.id/api/check-status/${latestTx.order_id}`, {
+          headers: { 'x-api-key': cashiApiKey },
+          cache: 'no-store',
+        })
+        const checkData = await checkRes.json()
+
+        if (checkRes.ok && (checkData.status === 'SETTLED' || checkData.status === 'PAID')) {
+          const metadata = latestTx.customer_details || {}
+          const email = metadata?.email
+          const purpose = metadata?.purpose || 'google_review'
+          const targetUrl = metadata?.targetUrl || null
+
+          let targetUserId = metadata?.userId || null
+          if (!targetUserId && email) {
+            const cleanEmail = String(email).trim().toLowerCase()
+            const { data: existingUser } = await supabaseAdmin
+              .from('users')
+              .select('id')
+              .eq('email', cleanEmail)
+              .maybeSingle()
+
+            if (existingUser) {
+              targetUserId = existingUser.id
+            } else {
+              const defaultName = cleanEmail.split('@')[0]
+              const { data: newUser } = await supabaseAdmin
+                .from('users')
+                .insert({
+                  email: cleanEmail,
+                  name: defaultName,
+                  role: 'user',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .select('id')
+                .single()
+              if (newUser) targetUserId = newUser.id
+            }
+          }
+
+          const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
+          const cardMode = isDirectMode ? 'direct' : 'profile'
+          const redirectUrl = isDirectMode ? (targetUrl || 'https://maps.google.com') : null
+          const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
+
+          await supabaseAdmin
+            .from('cards')
+            .update({
+              payment_status: 'paid',
+              status: 'active',
+              mode: cardMode,
+              redirect_url: redirectUrl,
+              card_name: cardName,
+              ...(targetUserId ? { user_id: targetUserId } : {}),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', card.id)
+
+          await supabaseAdmin
+            .from('transactions')
+            .update({ transaction_status: 'paid', updated_at: new Date().toISOString() })
+            .eq('order_id', latestTx.order_id)
+
+          if (isDirectMode && redirectUrl) {
+            redirect(redirectUrl)
+          }
+          isUnpaidCard = false
+        }
+      }
+    } catch (_) {}
+  }
+
   // Unclaimed — show claim page
-  const isUnpaidCard = card.redirect_url === 'UNPAID'
   if (card.status === 'unclaimed' || !card.user_id) {
     return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }

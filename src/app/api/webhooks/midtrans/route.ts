@@ -48,14 +48,71 @@ export async function POST(req: NextRequest) {
       const cardId = custom_field1
       const userId = custom_field2
 
+      let metadata: any = null
+      if (body.custom_field3) {
+        try { metadata = JSON.parse(body.custom_field3) } catch (_) {}
+      }
+
+      if (!metadata) {
+        try {
+          const { data: tx } = await supabaseAdmin
+            .from('transactions')
+            .select('customer_details')
+            .eq('order_id', order_id)
+            .maybeSingle()
+          if (tx?.customer_details) {
+            metadata = tx.customer_details
+          }
+        } catch (_) {}
+      }
+
+      const email = metadata?.email
+      const purpose = metadata?.purpose || 'google_review'
+      const targetUrl = metadata?.targetUrl || null
+
+      let targetUserId = userId || null
+      if (!targetUserId && email) {
+        const cleanEmail = String(email).trim().toLowerCase()
+        const { data: existingUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', cleanEmail)
+          .maybeSingle()
+
+        if (existingUser) {
+          targetUserId = existingUser.id
+        } else {
+          const defaultName = cleanEmail.split('@')[0]
+          const { data: newUser } = await supabaseAdmin
+            .from('users')
+            .insert({
+              email: cleanEmail,
+              name: defaultName,
+              role: 'user',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select('id')
+            .single()
+          if (newUser) targetUserId = newUser.id
+        }
+      }
+
+      const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
+      const cardMode = isDirectMode ? 'direct' : 'profile'
+      const redirectUrl = isDirectMode ? (targetUrl || 'https://maps.google.com') : null
+      const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
+
       const updateData: Record<string, unknown> = {
         payment_status: 'paid',
-        redirect_url: null,
         status: 'active',
+        mode: cardMode,
+        redirect_url: redirectUrl,
+        card_name: cardName,
         updated_at: new Date().toISOString(),
       }
-      if (userId) {
-        updateData.user_id = userId
+      if (targetUserId) {
+        updateData.user_id = targetUserId
       }
 
       let query = supabaseAdmin.from('cards').update(updateData)

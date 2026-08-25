@@ -72,6 +72,22 @@ export default function ClaimPage({
     cardName: string
   } | null>(null)
 
+  // Unpaid setup & payment form states
+  const [payEmail, setPayEmail] = useState('')
+  const [payPurpose, setPayPurpose] = useState<'google_review' | 'business_card' | 'custom_redirect'>('google_review')
+  const [payGoogleMapsUrl, setPayGoogleMapsUrl] = useState('')
+  const [payCustomRedirectUrl, setPayCustomRedirectUrl] = useState('')
+  const [payGeneratingReviewLink, setPayGeneratingReviewLink] = useState(false)
+  const [payReviewLinkSuccessNote, setPayReviewLinkSuccessNote] = useState<string | null>(null)
+  const [payFormError, setPayFormError] = useState<string | null>(null)
+
+  // Auto fill payEmail if session exists
+  useEffect(() => {
+    if (session?.user?.email && !payEmail) {
+      setPayEmail(session.user.email)
+    }
+  }, [session, payEmail])
+
   // Direct claim handler for logged in owner
   const handleDirectClaim = async () => {
     setClaimingOwner(true)
@@ -198,26 +214,72 @@ export default function ClaimPage({
 
   const handlePayAndClaim = async () => {
     setLoadingPay(true)
+    setPayFormError(null)
+
+    const cleanEmail = payEmail.trim().toLowerCase()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setPayFormError('Email pemilik/pembeli kartu wajib diisi dengan benar.')
+      setLoadingPay(false)
+      return
+    }
+
+    let targetUrl = payPurpose === 'google_review' ? payGoogleMapsUrl.trim() :
+                    payPurpose === 'custom_redirect' ? payCustomRedirectUrl.trim() : ''
+
+    if (payPurpose === 'google_review' && !targetUrl) {
+      setPayFormError('Link Google Maps bisnis kamu wajib diisi.')
+      setLoadingPay(false)
+      return
+    }
+
+    if (payPurpose === 'custom_redirect' && !targetUrl) {
+      setPayFormError('URL target redirect wajib diisi.')
+      setLoadingPay(false)
+      return
+    }
+
+    // Auto format 5-Star review link if raw maps link provided and not yet formatted
+    if (payPurpose === 'google_review' && targetUrl && !targetUrl.includes('writereview?placeid=')) {
+      try {
+        const genRes = await fetch('/api/tools/google-review-generator', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: targetUrl }),
+        })
+        const genData = await genRes.json()
+        if (genData.success && genData.reviewUrl) {
+          targetUrl = genData.reviewUrl
+        }
+      } catch (_) {}
+    }
+
     try {
-      const res = await fetch(`/api/cards/${cardId || code}/pay`, { method: 'POST' })
+      const res = await fetch(`/api/cards/${cardId || code}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          purpose: payPurpose,
+          targetUrl,
+        }),
+      })
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        if (res.status === 401) {
-          const redirectTarget = `/c/${code}?autoClaim=${code}`
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(redirectTarget)}`
-          return
-        }
-        alert(data.error || 'Gagal memulai pembayaran.')
+        setPayFormError(data.error || 'Gagal memulai pembayaran.')
         setLoadingPay(false)
         return
       }
 
-      if (data.snapToken && window.snap) {
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl
+        return
+      } else if (data.snapToken && window.snap) {
         window.snap.pay(data.snapToken, {
           onSuccess: () => {
-            alert('Pembayaran berhasil! Membuka dashboard...')
-            window.location.href = `/dashboard?claimed=${code}`
+            alert('Pembayaran berhasil! Membuka halaman aktivasi kartu...')
+            window.location.reload()
           },
           onPending: () => {
             alert('Menunggu pembayaran selesai...')
@@ -233,7 +295,7 @@ export default function ClaimPage({
         window.location.href = data.redirectUrl
       }
     } catch (err: any) {
-      alert(err?.message || 'Gagal memproses pembayaran.')
+      setPayFormError(err?.message || 'Gagal memproses pembayaran.')
     }
     setLoadingPay(false)
   }
@@ -345,13 +407,13 @@ export default function ClaimPage({
   const ONY_CAPABILITIES = [
     {
       icon: MapPin,
-      title: '⭐ Direct 5-Star Google Review',
-      desc: 'Pelanggan cukup tap/scan kartu untuk langsung beri ulasan bintang 5 di Google Maps bisnis kamu.',
+      title: 'Direct Google Review Form',
+      desc: '1 tap NFC / scan QR langsung membuka pop-up form ulasan Google Maps bisnis kamu tanpa perlu ketik lokasi.',
     },
     {
       icon: Sparkles,
       title: 'Auto Review Link Generator',
-      desc: 'Cukup paste link Google Maps bisnis, sistem otomatis ubah jadi link ulasan bintang 5 langsung.',
+      desc: 'Cukup paste link lokasi Google Maps bisnis, sistem otomatis mengubahnya menjadi link ulasan langsung.',
     },
     {
       icon: CreditCard,
@@ -429,7 +491,7 @@ export default function ClaimPage({
                   Media Tap Pintar Google Review
                 </div>
                 <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed">
-                  Solusi cepat memperbanyak ulasan bintang 5 Google Maps bisnis kamu! <strong className="text-slate-900">Cukup 1 tap NFC / scan QR</strong>. Juga bisa difungsikan sebagai Kartu Nama Digital & Direct Redirect URL.
+                  Solusi praktis memperbanyak ulasan Google Maps bisnis kamu! <strong className="text-slate-900">Cukup 1 tap NFC / scan QR</strong>, pelanggan langsung diarahkan ke form ulasan tanpa ribet cari nama lokasi.
                 </p>
               </div>
 
@@ -483,18 +545,165 @@ export default function ClaimPage({
                   </p>
                 </div>
 
+                {/* Form Input Data Aktivasi & Pembeli */}
+                <div className="space-y-4 mb-5 text-left bg-slate-50/80 p-4 rounded-2xl border border-slate-200/90">
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                      Email Pemilik / Pembeli <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        value={payEmail}
+                        onChange={(e) => {
+                          setPayEmail(e.target.value)
+                          setPayFormError(null)
+                        }}
+                        placeholder="Masukkan email kamu (misal: user@gmail.com)"
+                        className="w-full pl-10 pr-4 py-3 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-ony-blue font-medium shadow-xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">Email ini akan terhubung dengan kartu untuk mengedit data via Dashboard.</p>
+                  </div>
+
+                  {/* Purpose Selection */}
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                      Tujuan Utama Kartu <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { value: 'google_review', icon: MapPin, label: 'Google Review', desc: 'Form Ulasan ⭐', color: 'border-amber-400 bg-amber-50 text-amber-700', inactive: 'border-slate-200 bg-white text-slate-600' },
+                        { value: 'business_card', icon: CreditCard, label: 'Business Card', desc: 'Profil & Bio', color: 'border-blue-300 bg-blue-50 text-ony-blue', inactive: 'border-slate-200 bg-white text-slate-600' },
+                        { value: 'custom_redirect', icon: Link2, label: 'Custom URL', desc: 'Redirect Bebas', color: 'border-purple-300 bg-purple-50 text-purple-600', inactive: 'border-slate-200 bg-white text-slate-600' },
+                      ] as const).map(({ value, icon: Icon, label, desc, color, inactive }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            setPayPurpose(value)
+                            setPayFormError(null)
+                          }}
+                          className={`flex flex-col items-center text-center gap-1 p-2.5 rounded-xl border-2 transition-all font-display cursor-pointer ${
+                            payPurpose === value ? color : inactive
+                          }`}
+                        >
+                          <Icon size={16} />
+                          <span className="font-extrabold text-[11px]">{label}</span>
+                          <span className="text-[9px] leading-tight opacity-70">{desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Google Maps / Target URL Input */}
+                  {payPurpose === 'google_review' && (
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                        Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="url"
+                          value={payGoogleMapsUrl}
+                          onChange={(e) => {
+                            setPayGoogleMapsUrl(e.target.value)
+                            setPayFormError(null)
+                          }}
+                          placeholder="https://maps.app.goo.gl/... atau paste link lokasi Maps"
+                          className="w-full pl-10 pr-24 py-3 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium shadow-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!payGoogleMapsUrl.trim()) return
+                            setPayGeneratingReviewLink(true)
+                            setPayFormError(null)
+                            try {
+                              const res = await fetch('/api/tools/google-review-generator', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ input: payGoogleMapsUrl }),
+                              })
+                              const data = await res.json()
+                              if (data.success && data.reviewUrl) {
+                                setPayGoogleMapsUrl(data.reviewUrl)
+                                setPayReviewLinkSuccessNote('Link ulasan Google Maps berhasil dibuat!')
+                              }
+                            } catch (_) {}
+                            setPayGeneratingReviewLink(false)
+                          }}
+                          disabled={payGeneratingReviewLink || !payGoogleMapsUrl}
+                          className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[11px] disabled:opacity-50 transition-all flex items-center gap-1 font-display shadow-xs cursor-pointer"
+                        >
+                          {payGeneratingReviewLink ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                          <span>Generate</span>
+                        </button>
+                      </div>
+                      {payReviewLinkSuccessNote ? (
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+                          <CheckCircle2 size={13} /> {payReviewLinkSuccessNote}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                          Paste link lokasi Google Maps bisnis kamu, lalu klik <strong>Generate</strong>.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {payPurpose === 'custom_redirect' && (
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                        URL Target Redirect <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Link2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="url"
+                          value={payCustomRedirectUrl}
+                          onChange={(e) => {
+                            setPayCustomRedirectUrl(e.target.value)
+                            setPayFormError(null)
+                          }}
+                          placeholder="https://wa.me/628123456789 atau link landing page"
+                          className="w-full pl-10 pr-4 py-3 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium shadow-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {payPurpose === 'business_card' && (
+                    <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-slate-600 leading-relaxed flex items-start gap-2">
+                      <Sparkles size={15} className="text-ony-blue shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Profil Digital disiapkan:</strong> Setelah pembayaran selesai, kamu bisa melengkapi nama, foto profil, dan kontak via Dashboard.
+                      </div>
+                    </div>
+                  )}
+
+                  {payFormError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold flex items-center gap-2">
+                      <AlertCircle size={15} className="shrink-0" />
+                      <span>{payFormError}</span>
+                    </div>
+                  )}
+                </div>
+
                 {price === null ? (
                   <div className="w-full h-13 rounded-2xl bg-slate-200 animate-pulse flex items-center justify-center text-slate-500 text-xs font-semibold">
-                    Memuat sistem pembayaran Midtrans...
+                    Memuat sistem pembayaran...
                   </div>
                 ) : (
                   <button
                     onClick={handlePayAndClaim}
                     disabled={loadingPay}
-                    className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-ony-gradient text-white font-extrabold text-sm shadow-xl shadow-blue-500/25 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display"
+                    className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-ony-gradient text-white font-extrabold text-sm shadow-xl shadow-blue-500/25 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display cursor-pointer"
                   >
                     <ShoppingCart size={18} />
-                    <span>{loadingPay ? 'Memproses Midtrans...' : `Aktifkan & Bayar Kartu (Rp ${price.toLocaleString('id-ID')})`}</span>
+                    <span>{loadingPay ? 'Memproses Pembayaran...' : `Aktifkan & Bayar Kartu (Rp ${price.toLocaleString('id-ID')})`}</span>
                     <ArrowRight size={16} className="ml-auto" />
                   </button>
                 )}
