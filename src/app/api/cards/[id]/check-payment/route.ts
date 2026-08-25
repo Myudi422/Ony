@@ -11,47 +11,15 @@ export async function GET(
   try {
     const { id } = await params
     const { searchParams } = new URL(req.url)
-    let orderId = searchParams.get('orderId')
+    const orderId = searchParams.get('orderId')
     const email = searchParams.get('email')
     const name = searchParams.get('name')
     const purpose = searchParams.get('purpose') || 'business_card'
     const googleMapsUrl = searchParams.get('googleMapsUrl')
     const customRedirectUrl = searchParams.get('customRedirectUrl')
 
-    // Find Card
-    let { data: card } = await supabaseAdmin
-      .from('cards')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (!card) {
-      const { data: byCode } = await supabaseAdmin
-        .from('cards')
-        .select('*')
-        .eq('activation_code', id.toUpperCase())
-        .maybeSingle()
-      card = byCode
-    }
-
-    if (!card) {
-      return NextResponse.json({ error: 'Kartu tidak ditemukan' }, { status: 404 })
-    }
-
     if (!orderId) {
-      const { data: tx } = await supabaseAdmin
-        .from('transactions')
-        .select('order_id')
-        .ilike('order_id', `CARD-CLAIM-${card.activation_code}-%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      orderId = tx?.order_id || null
-    }
-
-    if (!orderId) {
-      return NextResponse.json({ error: 'Order ID tidak ditemukan untuk kartu ini.' }, { status: 400 })
+      return NextResponse.json({ error: 'Order ID wajib disertakan.' }, { status: 400 })
     }
 
     // 1. Query Cash.id status API with x-api-key header
@@ -81,6 +49,29 @@ export async function GET(
     }
 
     // 2. Settlement confirmed! Process card claim & activation
+    // Parse activation code from orderId: CARD-CLAIM-[CODE]-[TIMESTAMP]
+    const parts = orderId.split('-')
+    const code = parts[2] || id
+
+    // Find Card
+    let { data: card } = await supabaseAdmin
+      .from('cards')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (!card && code) {
+      const { data: byCode } = await supabaseAdmin
+        .from('cards')
+        .select('*')
+        .eq('activation_code', code.toUpperCase())
+        .maybeSingle()
+      card = byCode
+    }
+
+    if (!card) {
+      return NextResponse.json({ error: 'Kartu tidak ditemukan' }, { status: 404 })
+    }
 
     // Find or Create User for target email (if email supplied)
     let targetUserId = card.user_id

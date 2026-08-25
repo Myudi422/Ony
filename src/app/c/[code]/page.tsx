@@ -34,7 +34,7 @@ export default async function CardPage({ params, searchParams }: Props) {
   // Optimized query: Select only existing required fields
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
+    .select('id, activation_code, card_name, mode, redirect_url, status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
     .eq('activation_code', code.toUpperCase())
     .single()
 
@@ -101,71 +101,10 @@ export default async function CardPage({ params, searchParams }: Props) {
     )
   }
 
-  // Unclaimed or Unpaid check — auto-verify with Cash.id if there is a pending transaction
-  let activeCard = card
-  let isUnpaidCard = activeCard.redirect_url === 'UNPAID' || activeCard.payment_status === 'unpaid' || activeCard.status === 'unclaimed'
-
-  if (isUnpaidCard) {
-    try {
-      const { data: tx } = await supabaseAdmin
-        .from('transactions')
-        .select('order_id, transaction_status')
-        .ilike('order_id', `CARD-CLAIM-${code.toUpperCase()}-%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (tx?.order_id && tx.transaction_status !== 'settled') {
-        const { getLivePricing } = await import('@/lib/pricing')
-        const pricing = await getLivePricing()
-        const apiKey = pricing.cashi_api_key
-
-        if (apiKey) {
-          const cashiRes = await fetch(`https://cashi.id/api/check-status/${tx.order_id}`, {
-            headers: {
-              'x-api-key': apiKey,
-              'Cache-Control': 'no-cache',
-            },
-            cache: 'no-store',
-          })
-
-          const statusData = await cashiRes.json().catch(() => null)
-          const rawStatus = String(statusData?.status || statusData?.transaction_status || '').toUpperCase()
-
-          if (rawStatus === 'SETTLED' || rawStatus === 'SUCCESS' || rawStatus === 'PAID') {
-            // Update transaction to settled
-            await supabaseAdmin
-              .from('transactions')
-              .update({ transaction_status: 'settled', updated_at: new Date().toISOString() })
-              .eq('order_id', tx.order_id)
-
-            // Update card to paid & active
-            const { data: updatedCard } = await supabaseAdmin
-              .from('cards')
-              .update({
-                payment_status: 'paid',
-                status: activeCard.user_id ? 'active' : 'unclaimed',
-                redirect_url: activeCard.redirect_url === 'UNPAID' ? null : activeCard.redirect_url,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', activeCard.id)
-              .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
-              .single()
-
-            if (updatedCard) {
-              activeCard = updatedCard
-              isUnpaidCard = activeCard.redirect_url === 'UNPAID' || activeCard.payment_status === 'unpaid'
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error auto-checking Cash.id status on CardPage load:', err)
-    }
-  }
-
-  if (activeCard.status === 'unclaimed' || !activeCard.user_id) {
-    return <ClaimPage code={code.toUpperCase()} mediaType={activeCard.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={activeCard.id} />
+  // Unclaimed — show claim page
+  const isUnpaidCard = card.redirect_url === 'UNPAID'
+  if (card.status === 'unclaimed' || !card.user_id) {
+    return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
 
   // Active — Direct Mode or Google Review Maps Mode (INSTANT REDIRECT)
