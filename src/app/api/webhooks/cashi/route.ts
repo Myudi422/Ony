@@ -87,11 +87,11 @@ export async function POST(req: NextRequest) {
       try {
         const { data: tx } = await supabaseAdmin
           .from('transactions')
-          .select('customer_details')
+          .select('snap_token')
           .eq('order_id', order_id)
           .maybeSingle()
-        if (tx?.customer_details) {
-          metadata = tx.customer_details
+        if (tx?.snap_token) {
+          try { metadata = JSON.parse(tx.snap_token) } catch (_) {}
         }
       } catch (_) {}
 

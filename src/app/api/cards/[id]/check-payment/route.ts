@@ -107,11 +107,14 @@ export async function POST(
         if (checkRes.ok && isSettled) {
           const { data: tx } = await supabaseAdmin
             .from('transactions')
-            .select('customer_details')
+            .select('snap_token')
             .eq('order_id', orderIdToCheck)
             .maybeSingle()
 
-          const metadata = tx?.customer_details || {}
+          let metadata: any = {}
+          if (tx?.snap_token) {
+            try { metadata = JSON.parse(tx.snap_token) } catch (_) {}
+          }
           const email = metadata?.email || fallbackEmail
           const purpose = metadata?.purpose || fallbackPurpose || 'google_review'
           const targetUrl = metadata?.targetUrl || fallbackTargetUrl

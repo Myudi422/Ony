@@ -49,6 +49,52 @@ export async function POST(
 
   if (!card) return NextResponse.json({ error: 'Kartu tidak ditemukan' }, { status: 404 })
 
+  // Find or create target user by email
+  let targetUserId = userId
+  if (!targetUserId && customerEmail) {
+    const cleanEmail = customerEmail.trim().toLowerCase()
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle()
+
+    if (existingUser) {
+      targetUserId = existingUser.id
+    } else {
+      const defaultName = cleanEmail.split('@')[0]
+      const { data: newUser } = await supabaseAdmin
+        .from('users')
+        .insert({
+          email: cleanEmail,
+          name: defaultName,
+          role: 'user',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      if (newUser) targetUserId = newUser.id
+    }
+  }
+
+  const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
+  const cardMode = isDirectMode ? 'direct' : 'profile'
+  const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : (isDirectMode ? 'https://maps.google.com' : null)
+  const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
+
+  // Pre-update card with user ownership and target link
+  const cardUpdate: Record<string, unknown> = {
+    mode: cardMode,
+    redirect_url: finalRedirectUrl,
+    card_name: cardName,
+    updated_at: new Date().toISOString(),
+  }
+  if (targetUserId) {
+    cardUpdate.user_id = targetUserId
+  }
+  await supabaseAdmin.from('cards').update(cardUpdate).eq('id', card.id)
+
   // 2. Fetch Live Dynamic Price
   const dynamicPricing = await getLivePricing()
   const price = dynamicPricing.is_promo_active
@@ -59,8 +105,8 @@ export async function POST(
   const metadata = {
     email: customerEmail,
     purpose,
-    targetUrl,
-    userId,
+    targetUrl: finalRedirectUrl,
+    userId: targetUserId,
     cardId: card.id,
     code: card.activation_code,
   }
@@ -69,21 +115,16 @@ export async function POST(
   const cashiApiKey = dynamicPricing.cashi_api_key || process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
 
   try {
-    // Save pending transaction record
-    const { error: txErr } = await supabaseAdmin.from('transactions').insert({
+    // Save pending transaction record (store metadata in snap_token string field)
+    await supabaseAdmin.from('transactions').insert({
       order_id: orderId,
-      user_id: userId,
       gross_amount: price,
       transaction_status: 'pending',
       payment_type: 'cashi',
-      customer_details: metadata,
+      snap_token: JSON.stringify(metadata),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-
-    if (txErr) {
-      console.error('Pending transaction insert error:', txErr)
-    }
 
     const returnUrl = `https://ony.my.id/c/${card.activation_code}`
 
