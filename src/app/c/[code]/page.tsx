@@ -32,10 +32,10 @@ export default async function CardPage({ params, searchParams }: Props) {
   const { code } = await params
   const { method } = await searchParams
 
-  // Optimized query: Select only existing required fields
+  // Optimized query: Select only required fields including payment_status
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('id, activation_code, card_name, mode, redirect_url, status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
+    .select('id, activation_code, card_name, mode, redirect_url, status, payment_status, total_taps, media_type, user_id, users(id, name, email, avatar_url)')
     .eq('activation_code', code.toUpperCase())
     .single()
 
@@ -104,6 +104,8 @@ export default async function CardPage({ params, searchParams }: Props) {
 
   // Fail-safe auto check status from Cashi.id if card is marked UNPAID
   let isUnpaidCard = card.redirect_url === 'UNPAID'
+  let targetRedirectUrl: string | null = null
+
   if (isUnpaidCard) {
     try {
       const livePricing = await getLivePricing()
@@ -182,23 +184,39 @@ export default async function CardPage({ params, searchParams }: Props) {
             .update({ transaction_status: 'paid', updated_at: new Date().toISOString() })
             .eq('order_id', latestTx.order_id)
 
-          if (isDirectMode && redirectUrl) {
-            redirect(redirectUrl)
-          }
+          // Update local card object properties in memory
+          card.payment_status = 'paid'
+          card.status = 'active'
+          card.mode = cardMode
+          card.redirect_url = redirectUrl
+          if (targetUserId) card.user_id = targetUserId
+
           isUnpaidCard = false
+
+          if (isDirectMode && redirectUrl) {
+            targetRedirectUrl = redirectUrl
+          }
         }
       }
     } catch (_) {}
   }
 
-  // Unclaimed — show claim page
-  if (card.status === 'unclaimed' || !card.user_id) {
-    return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
+  // Trigger redirect outside try/catch block if auto-check settled
+  if (targetRedirectUrl) {
+    redirect(targetRedirectUrl)
   }
 
-  // Active — Direct Mode or Google Review Maps Mode (INSTANT REDIRECT)
-  if ((card.mode === 'direct' || card.mode === 'review' || card.mode === 'google_review') && card.redirect_url) {
+  // Active Direct Mode / Google Review — INSTANT REDIRECT (regardless of user_id)
+  const isPaidOrHasUrl = card.payment_status === 'paid' || (card.redirect_url && card.redirect_url !== 'UNPAID')
+  const isDirect = card.mode === 'direct' || card.mode === 'review' || card.mode === 'google_review'
+
+  if (isPaidOrHasUrl && isDirect && card.redirect_url && card.redirect_url !== 'UNPAID') {
     redirect(card.redirect_url)
+  }
+
+  // Unclaimed or Unpaid — show claim page
+  if (card.status === 'unclaimed' || isUnpaidCard || (!card.user_id && !isDirect)) {
+    return <ClaimPage code={code.toUpperCase()} mediaType={card.media_type} paymentStatus={isUnpaidCard ? 'unpaid' : 'paid'} cardId={card.id} />
   }
 
   // Active — Profile Mode
