@@ -70,26 +70,22 @@ export async function POST(
 
   try {
     // Save pending transaction record
-    try {
-      if (userId) {
-        await supabaseAdmin
-          .from('transactions')
-          .delete()
-          .eq('user_id', userId)
-          .eq('transaction_status', 'pending')
-      }
+    const { error: txErr } = await supabaseAdmin.from('transactions').insert({
+      order_id: orderId,
+      user_id: userId,
+      gross_amount: price,
+      transaction_status: 'pending',
+      payment_type: 'cashi',
+      customer_details: metadata,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
 
-      await supabaseAdmin.from('transactions').insert({
-        order_id: orderId,
-        user_id: userId,
-        gross_amount: price,
-        transaction_status: 'pending',
-        payment_type: 'cashi',
-        customer_details: metadata,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    } catch (_) {}
+    if (txErr) {
+      console.error('Pending transaction insert error:', txErr)
+    }
+
+    const returnUrl = `https://ony.my.id/c/${card.activation_code}`
 
     const cashiRes = await fetch('https://cashi.id/api/create-order', {
       method: 'POST',
@@ -100,6 +96,9 @@ export async function POST(
       body: JSON.stringify({
         amount: price,
         order_id: orderId,
+        redirect_url: returnUrl,
+        return_url: returnUrl,
+        callback_url: 'https://ony.my.id/api/webhooks/cashi',
       }),
     })
 

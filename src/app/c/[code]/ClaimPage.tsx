@@ -272,6 +272,10 @@ export default function ClaimPage({
         return
       }
 
+      if (data.orderId && typeof window !== 'undefined') {
+        sessionStorage.setItem(`last_order_${code}`, data.orderId)
+      }
+
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl
         return
@@ -306,13 +310,34 @@ export default function ClaimPage({
     setCheckingStatus(true)
     setPayFormError(null)
     try {
-      const res = await fetch(`/api/cards/${cardId || code}/check-payment`, { method: 'POST' })
+      const savedOrderId = typeof window !== 'undefined' ? sessionStorage.getItem(`last_order_${code}`) : null
+      const res = await fetch(`/api/cards/${cardId || code}/check-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: savedOrderId || undefined }),
+      })
       const data = await res.json()
       if (res.ok && data.settled) {
         alert('Pembayaran berhasil terkonfirmasi! Kartu Anda sekarang telah aktif.')
         window.location.reload()
+        return
       } else {
-        setPayFormError(data.message || 'Pembayaran belum terdeteksi settled. Pastikan Anda sudah menyelesaikan transfer di Cashi.id.')
+        const manualOrderId = prompt(`${data.message || 'Transaksi belum terdeteksi.'}\n\nJika Anda memiliki Kode Order Cashi (Contoh: CARD-CLAIM-7E553G5Z-1787674559036), silakan tempel/masukkan di bawah ini:`)
+        if (manualOrderId && manualOrderId.trim()) {
+          const retryRes = await fetch(`/api/cards/${cardId || code}/check-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: manualOrderId.trim() }),
+          })
+          const retryData = await retryRes.json()
+          if (retryRes.ok && retryData.settled) {
+            alert('Pembayaran berhasil terkonfirmasi! Kartu Anda sekarang telah aktif.')
+            window.location.reload()
+            return
+          } else {
+            alert(retryData.message || 'Status pembayaran untuk ID Order tersebut belum Settled.')
+          }
+        }
       }
     } catch (_) {
       setPayFormError('Gagal terhubung ke server untuk mengecek status pembayaran.')

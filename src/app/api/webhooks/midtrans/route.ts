@@ -104,7 +104,6 @@ export async function POST(req: NextRequest) {
       const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
 
       const updateData: Record<string, unknown> = {
-        payment_status: 'paid',
         status: 'active',
         mode: cardMode,
         redirect_url: redirectUrl,

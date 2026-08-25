@@ -41,18 +41,35 @@ export async function POST(
       })
     }
 
+    const body = await req.json().catch(() => ({}))
+    const requestOrderId = body?.order_id || body?.orderId
+
     const livePricing = await getLivePricing()
     const cashiApiKey = livePricing.cashi_api_key || process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
 
-    // Find latest transaction for this card
+    // Build candidate order_id list
+    let candidateOrderIds: string[] = []
+
+    if (requestOrderId) {
+      candidateOrderIds.push(String(requestOrderId).trim())
+    }
+
     const { data: txList } = await supabaseAdmin
       .from('transactions')
       .select('order_id, customer_details, created_at')
       .ilike('order_id', `%${card.activation_code}%`)
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(10)
 
-    if (!txList || txList.length === 0) {
+    if (txList && txList.length > 0) {
+      for (const t of txList) {
+        if (t.order_id && !candidateOrderIds.includes(t.order_id)) {
+          candidateOrderIds.push(t.order_id)
+        }
+      }
+    }
+
+    if (candidateOrderIds.length === 0) {
       return NextResponse.json({
         success: false,
         settled: false,
@@ -61,16 +78,16 @@ export async function POST(
     }
 
     // Check each order_id against Cashi.id API
-    for (const tx of txList) {
-      if (!tx.order_id) continue
-
+    for (const orderIdToCheck of candidateOrderIds) {
       try {
-        const checkRes = await fetch(`https://cashi.id/api/check-status/${tx.order_id}`, {
+        const checkRes = await fetch(`https://cashi.id/api/check-status/${orderIdToCheck}`, {
           headers: { 'x-api-key': cashiApiKey },
           cache: 'no-store',
         })
 
         const checkData = await checkRes.json().catch(() => ({}))
+        console.log(`[Cashi Check-Status] order_id: ${orderIdToCheck}, status code: ${checkRes.status}, data:`, checkData)
+
         const statusStr = String(
           checkData?.status ||
           checkData?.data?.status ||
@@ -78,13 +95,20 @@ export async function POST(
           checkData?.data?.transaction_status ||
           checkData?.payment_status ||
           checkData?.data?.payment_status ||
+          checkData?.state ||
           ''
         ).toUpperCase()
 
-        const isSettled = ['SETTLED', 'PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'SETTLE'].includes(statusStr)
+        const isSettled = ['SETTLED', 'PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'SETTLE', 'SETTLEMENT'].includes(statusStr)
 
-        if (isSettled) {
-          const metadata = tx.customer_details || {}
+        if (checkRes.ok && isSettled) {
+          const { data: tx } = await supabaseAdmin
+            .from('transactions')
+            .select('customer_details')
+            .eq('order_id', orderIdToCheck)
+            .maybeSingle()
+
+          const metadata = tx?.customer_details || {}
           const email = metadata?.email
           const purpose = metadata?.purpose || 'google_review'
           const targetUrl = metadata?.targetUrl || null
@@ -119,26 +143,25 @@ export async function POST(
 
           const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
           const cardMode = isDirectMode ? 'direct' : 'profile'
-          const redirectUrl = isDirectMode ? (targetUrl || 'https://maps.google.com') : null
+          const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : (isDirectMode ? 'https://maps.google.com' : null)
           const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
 
           const updateObj: Record<string, unknown> = {
-            payment_status: 'paid',
             status: 'active',
             mode: cardMode,
-            redirect_url: redirectUrl,
+            redirect_url: finalRedirectUrl,
             card_name: cardName,
             updated_at: new Date().toISOString(),
           }
           if (targetUserId) updateObj.user_id = targetUserId
 
           await supabaseAdmin.from('cards').update(updateObj).eq('id', card.id)
-          await supabaseAdmin.from('transactions').update({ transaction_status: 'paid', updated_at: new Date().toISOString() }).eq('order_id', tx.order_id)
+          await supabaseAdmin.from('transactions').update({ transaction_status: 'paid', updated_at: new Date().toISOString() }).eq('order_id', orderIdToCheck)
 
           return NextResponse.json({
             success: true,
             settled: true,
-            redirectUrl,
+            redirectUrl: finalRedirectUrl,
             message: 'Pembayaran terverifikasi! Kartu berhasil diaktifkan.',
           })
         }

@@ -130,14 +130,13 @@ export async function POST(req: NextRequest) {
 
       const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
       const cardMode = isDirectMode ? 'direct' : 'profile'
-      const redirectUrl = isDirectMode ? (targetUrl || 'https://maps.google.com') : null
+      const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : (isDirectMode ? 'https://maps.google.com' : null)
       const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
 
       const updateData: Record<string, unknown> = {
-        payment_status: 'paid',
         status: 'active',
         mode: cardMode,
-        redirect_url: redirectUrl,
+        redirect_url: finalRedirectUrl,
         card_name: cardName,
         updated_at: new Date().toISOString(),
       }
