@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getLivePricing } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,20 +22,29 @@ export async function GET(
       return NextResponse.json({ error: 'Order ID wajib disertakan.' }, { status: 400 })
     }
 
-    // 1. Query Cash.id status API
+    // 1. Query Cash.id status API with x-api-key header
+    const pricing = await getLivePricing()
+    const apiKey = pricing.cashi_api_key
+
     const cashiRes = await fetch(`https://cashi.id/api/check-status/${orderId}`, {
-      headers: { 'Cache-Control': 'no-cache' },
+      headers: {
+        'x-api-key': apiKey,
+        'Cache-Control': 'no-cache',
+      },
     })
 
     const statusData = await cashiRes.json().catch(() => null)
+    console.log('Cash.id status response for', orderId, ':', statusData)
 
-    const isSettled = statusData?.status === 'SETTLED' || statusData?.status === 'SUCCESS' || statusData?.status === 'PAID'
+    const rawStatus = String(statusData?.status || statusData?.transaction_status || '').toUpperCase()
+    const isSettled = rawStatus === 'SETTLED' || rawStatus === 'SUCCESS' || rawStatus === 'PAID'
 
     if (!isSettled) {
       return NextResponse.json({
         success: true,
         paid: false,
         status: statusData?.status || 'PENDING',
+        debug: statusData,
       })
     }
 

@@ -505,16 +505,44 @@ export default function ClaimPage({
             </div>
 
             {/* Polling / Status Indicator */}
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 mb-4 flex items-center justify-center gap-2 text-xs">
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 mb-3 flex flex-col items-center justify-center gap-2 text-xs">
               {claimedSuccess ? (
                 <div className="text-emerald-400 font-bold flex items-center gap-2">
                   <CheckCircle2 size={16} />
-                  <span>Pembayaran Lunas! Kartu Aktif...</span>
+                  <span>Pembayaran Lunas! Memuat kartu...</span>
                 </div>
               ) : (
-                <div className="text-amber-400 font-medium flex items-center gap-2">
-                  <RefreshCw size={14} className="animate-spin text-amber-400" />
-                  <span>Menunggu Pembayaran (Auto-check 3d)...</span>
+                <div className="w-full flex items-center justify-between gap-2">
+                  <div className="text-amber-400 font-medium flex items-center gap-2 text-left">
+                    <RefreshCw size={14} className="animate-spin text-amber-400 shrink-0" />
+                    <span className="text-[11px]">Menunggu Pembayaran... ({pollingStatus})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const query = new URLSearchParams({
+                          orderId: cashiOrder.orderId,
+                          email,
+                          name,
+                          purpose: cardPurpose,
+                          ...(googleMapsUrl ? { googleMapsUrl } : {}),
+                          ...(customRedirectUrl ? { customRedirectUrl } : {}),
+                        })
+                        const res = await fetch(`/api/cards/${cardId}/check-payment?${query.toString()}`)
+                        const data = await res.json()
+                        if (data.paid || data.status === 'SETTLED' || data.status === 'PAID') {
+                          setClaimedSuccess(true)
+                          setTimeout(() => router.refresh(), 1200)
+                        } else {
+                          setPollingStatus(data.status || 'PENDING')
+                        }
+                      } catch (err) {}
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] whitespace-nowrap transition-all"
+                  >
+                    Cek Status
+                  </button>
                 </div>
               )}
             </div>

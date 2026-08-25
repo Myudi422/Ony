@@ -29,20 +29,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
     }
 
-    const expectedSig = crypto
+    const expectedSigRaw = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(rawBodyText)
+      .digest('hex')
+
+    const expectedSigJson = crypto
       .createHmac('sha256', webhookSecret)
       .update(JSON.stringify(body))
       .digest('hex')
 
-    if (signature !== expectedSig) {
-      console.warn('Cash.id Webhook signature mismatch:', { received: signature, expected: expectedSig })
+    if (signature !== expectedSigRaw && signature !== expectedSigJson) {
+      console.warn('Cash.id Webhook signature mismatch:', { received: signature, expectedRaw: expectedSigRaw, expectedJson: expectedSigJson })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
     const { event, data } = body
+    const statusUpper = String(data?.status || '').toUpperCase()
 
-    if (event === 'PAYMENT_SETTLED' && data?.status === 'SETTLED') {
-      const orderId = data.order_id || data.orderId
+    if (event === 'PAYMENT_SETTLED' || statusUpper === 'SETTLED' || statusUpper === 'SUCCESS' || statusUpper === 'PAID') {
+      const orderId = data?.order_id || data?.orderId || body.order_id || body.orderId
 
       if (orderId && typeof orderId === 'string' && orderId.startsWith('CARD-CLAIM-')) {
         const parts = orderId.split('-')
