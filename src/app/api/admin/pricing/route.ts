@@ -28,12 +28,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { card_base_price, card_promo_price, is_promo_active } = body
+  const { card_base_price, card_promo_price, is_promo_active, cashi_api_key, cashi_webhook_secret } = body
 
   const updatedPricing = {
-    card_base_price: Number(card_base_price) || DEFAULT_PRICING.card_base_price,
-    card_promo_price: Number(card_promo_price) || DEFAULT_PRICING.card_promo_price,
+    card_base_price: Number(card_base_price) >= 1 ? Number(card_base_price) : DEFAULT_PRICING.card_base_price,
+    card_promo_price: Number(card_promo_price) >= 1 ? Number(card_promo_price) : DEFAULT_PRICING.card_promo_price,
     is_promo_active: Boolean(is_promo_active),
+    cashi_api_key: String(cashi_api_key || DEFAULT_PRICING.cashi_api_key).trim(),
+    cashi_webhook_secret: String(cashi_webhook_secret || DEFAULT_PRICING.cashi_webhook_secret).trim(),
   }
 
   // Update in-memory cache immediately
@@ -81,6 +83,8 @@ export async function PATCH(req: NextRequest) {
       { key: 'card_base_price', value: String(updatedPricing.card_base_price), updated_at: new Date().toISOString() },
       { key: 'card_promo_price', value: String(updatedPricing.card_promo_price), updated_at: new Date().toISOString() },
       { key: 'is_promo_active', value: String(updatedPricing.is_promo_active), updated_at: new Date().toISOString() },
+      { key: 'cashi_api_key', value: updatedPricing.cashi_api_key, updated_at: new Date().toISOString() },
+      { key: 'cashi_webhook_secret', value: updatedPricing.cashi_webhook_secret, updated_at: new Date().toISOString() },
     ]
     await supabaseAdmin.from('system_settings').upsert(updates, { onConflict: 'key' })
   } catch (_) {}
