@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
   if (!token?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { code } = await req.json()
+  const { code, purpose, redirectUrl } = await req.json()
   if (!code) return NextResponse.json({ error: 'Activation code required' }, { status: 400 })
 
   const cleanCode = String(code).trim().toUpperCase()
@@ -37,6 +37,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kartu blangko kosongan ini wajib dibayar via Midtrans sebelum diklaim.' }, { status: 400 })
   }
 
+  // Determine mode and redirect_url based on selected purpose
+  let mode = card.mode || 'profile'
+  let finalRedirectUrl = card.redirect_url
+
+  if (purpose === 'google_review') {
+    mode = 'google_review'
+    finalRedirectUrl = redirectUrl ? String(redirectUrl).trim() : null
+  } else if (purpose === 'custom_redirect') {
+    mode = 'direct'
+    finalRedirectUrl = redirectUrl ? String(redirectUrl).trim() : null
+  } else if (purpose === 'business_card') {
+    mode = 'profile'
+    finalRedirectUrl = null
+  }
+
   // Bind card to user
   const { data: updated, error: updateErr } = await supabaseAdmin
     .from('cards')
@@ -44,6 +59,8 @@ export async function POST(req: NextRequest) {
       user_id: token.userId as string,
       status: 'active',
       card_name: `${token.name ?? 'Saya'}'s Card`,
+      mode: mode,
+      redirect_url: finalRedirectUrl,
       updated_at: new Date().toISOString(),
     })
     .eq('id', card.id)

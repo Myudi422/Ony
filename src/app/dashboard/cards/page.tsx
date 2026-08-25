@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Image from 'next/image'
 import {
   Plus, Save, ExternalLink, Wifi, Trash2, GripVertical,
   CreditCard, Tag, Tv, Key, QrCode, Globe, MessageCircle,
   Instagram, Linkedin, Youtube, Twitter, Mail, Phone, FileText,
   ShoppingBag, Check, Activity, Eye, RefreshCw, Power, Edit3,
-  AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles, User2, Link2
+  AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles, User2, Link2,
+  Search, SlidersHorizontal, ChevronLeft, ChevronRight, Zap, BarChart3,
+  Layers, ArrowUpDown
 } from 'lucide-react'
 import { cn, MEDIA_TYPE_LABELS, STATUS_COLORS, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -70,6 +72,8 @@ interface UserProfile {
   avatar_url: string | null
 }
 
+const CARDS_PER_PAGE = 6
+
 export default function CardsPage() {
   const [cards, setCards] = useState<Card[]>([])
   const [selected, setSelected] = useState<Card | null>(null)
@@ -78,6 +82,13 @@ export default function CardsPage() {
   const [savingCard, setSavingCard] = useState(false)
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'logs'>('editor')
+
+  // Search & Filter State for Cards List
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterMediaType, setFilterMediaType] = useState<string>('all')
+  const [filterMode, setFilterMode] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'newest' | 'most_taps' | 'name'>('newest')
+  const [cardsPage, setCardsPage] = useState(1)
 
   // User profile editing
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -100,69 +111,6 @@ export default function CardsPage() {
   // Delete / Unlink Card Modal States
   const [deletingCard, setDeletingCard] = useState<Card | null>(null)
   const [isDeletingCard, setIsDeletingCard] = useState(false)
-
-  const handleDeleteCardConfirmed = async () => {
-    if (!deletingCard) return
-    setIsDeletingCard(true)
-
-    try {
-      const res = await fetch(`/api/cards/${deletingCard.id}`, {
-        method: 'DELETE',
-      })
-      const data = await res.json()
-
-      if (!res.ok || data.error) {
-        showToast(data.error || 'Gagal menghapus kartu.', 'error')
-        setIsDeletingCard(false)
-        return
-      }
-
-      // Success! Remove card from local state
-      const remainingCards = cards.filter(c => c.id !== deletingCard.id)
-      setCards(remainingCards)
-      setSelected(remainingCards.length > 0 ? remainingCards[0] : null)
-      setDeletingCard(null)
-      showToast('Kartu berhasil dihapus & di-reset ke status unclaimed!')
-    } catch (_) {
-      showToast('Terjadi kesalahan saat menghapus kartu.', 'error')
-    }
-    setIsDeletingCard(false)
-  }
-
-  // Google Review generator state
-  const [generatingReview, setGeneratingReview] = useState(false)
-  const [reviewNote, setReviewNote] = useState<string | null>(null)
-
-  const handleGenerateReviewLink = async () => {
-    if (!selected?.redirect_url) return
-    setGeneratingReview(true)
-    setReviewNote(null)
-
-    try {
-      const res = await fetch('/api/tools/google-review-generator', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: selected.redirect_url }),
-      })
-      const data = await res.json()
-      if (data.reviewUrl) {
-        setSelected({ ...selected, redirect_url: data.reviewUrl })
-        showToast('Link ulasan bintang 5 Google berhasil diproses!')
-        if (data.note) setReviewNote(data.note)
-      } else if (data.error) {
-        showToast(data.error, 'error')
-      }
-    } catch (_) {
-      showToast('Gagal memproses link Google Maps.', 'error')
-    }
-    setGeneratingReview(false)
-  }
-
-  const [linkForm, setLinkForm] = useState({
-    title: '',
-    url: '',
-    icon_type: 'whatsapp'
-  })
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
@@ -224,6 +172,55 @@ export default function CardsPage() {
 
   useEffect(() => { loadCards() }, [loadCards])
 
+  // Filter & Search Logic for Card Selector
+  const filteredCards = useMemo(() => {
+    let result = [...cards]
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      result = result.filter(c =>
+        c.card_name.toLowerCase().includes(q) ||
+        c.activation_code.toLowerCase().includes(q) ||
+        (c.redirect_url && c.redirect_url.toLowerCase().includes(q))
+      )
+    }
+
+    if (filterMediaType !== 'all') {
+      result = result.filter(c => c.media_type === filterMediaType)
+    }
+
+    if (filterMode !== 'all') {
+      if (filterMode === 'google_review') {
+        result = result.filter(c => c.mode === 'google_review' || c.mode === 'review')
+      } else {
+        result = result.filter(c => c.mode === filterMode)
+      }
+    }
+
+    if (sortBy === 'most_taps') {
+      result.sort((a, b) => (b.total_taps || 0) - (a.total_taps || 0))
+    } else if (sortBy === 'name') {
+      result.sort((a, b) => a.card_name.localeCompare(b.card_name))
+    }
+
+    return result
+  }, [cards, searchQuery, filterMediaType, filterMode, sortBy])
+
+  // Reset page when search or filter changes
+  useEffect(() => {
+    setCardsPage(1)
+  }, [searchQuery, filterMediaType, filterMode, sortBy])
+
+  const totalCardsPages = Math.ceil(filteredCards.length / CARDS_PER_PAGE) || 1
+  const paginatedCards = useMemo(() => {
+    const start = (cardsPage - 1) * CARDS_PER_PAGE
+    return filteredCards.slice(start, start + CARDS_PER_PAGE)
+  }, [filteredCards, cardsPage])
+
+  // Overall Statistics Summary
+  const totalTaps = useMemo(() => cards.reduce((sum, c) => sum + (c.total_taps || 0), 0), [cards])
+  const activeCardsCount = useMemo(() => cards.filter(c => c.status === 'active' || c.status === 'claimed').length, [cards])
+
   // Fetch card details (links & logs) when selected card changes
   const loadCardDetails = useCallback(async () => {
     if (!selected) return
@@ -249,6 +246,68 @@ export default function CardsPage() {
   }, [selected])
 
   useEffect(() => { loadCardDetails() }, [loadCardDetails])
+
+  const handleDeleteCardConfirmed = async () => {
+    if (!deletingCard) return
+    setIsDeletingCard(true)
+
+    try {
+      const res = await fetch(`/api/cards/${deletingCard.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        showToast(data.error || 'Gagal menghapus kartu.', 'error')
+        setIsDeletingCard(false)
+        return
+      }
+
+      const remainingCards = cards.filter(c => c.id !== deletingCard.id)
+      setCards(remainingCards)
+      setSelected(remainingCards.length > 0 ? remainingCards[0] : null)
+      setDeletingCard(null)
+      showToast('Kartu berhasil dihapus & di-reset ke status unclaimed!')
+    } catch (_) {
+      showToast('Terjadi kesalahan saat menghapus kartu.', 'error')
+    }
+    setIsDeletingCard(false)
+  }
+
+  // Google Review generator state
+  const [generatingReview, setGeneratingReview] = useState(false)
+  const [reviewNote, setReviewNote] = useState<string | null>(null)
+
+  const handleGenerateReviewLink = async () => {
+    if (!selected?.redirect_url) return
+    setGeneratingReview(true)
+    setReviewNote(null)
+
+    try {
+      const res = await fetch('/api/tools/google-review-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: selected.redirect_url }),
+      })
+      const data = await res.json()
+      if (data.reviewUrl) {
+        setSelected({ ...selected, redirect_url: data.reviewUrl })
+        showToast('Link ulasan bintang 5 Google berhasil diproses!')
+        if (data.note) setReviewNote(data.note)
+      } else if (data.error) {
+        showToast(data.error, 'error')
+      }
+    } catch (_) {
+      showToast('Gagal memproses link Google Maps.', 'error')
+    }
+    setGeneratingReview(false)
+  }
+
+  const [linkForm, setLinkForm] = useState({
+    title: '',
+    url: '',
+    icon_type: 'whatsapp'
+  })
 
   // Save Card Settings Manually via Button Click
   const saveCardSettings = async () => {
@@ -415,7 +474,7 @@ export default function CardsPage() {
   const currentPlatform = PLATFORM_OPTIONS[linkForm.icon_type] ?? PLATFORM_OPTIONS.other
 
   return (
-    <div className="max-w-5xl w-full mx-auto text-slate-900 relative min-w-0 space-y-6">
+    <div className="max-w-6xl w-full mx-auto text-slate-900 relative min-w-0 space-y-6 pb-12">
       
       {/* Success / Error Floating Toast Notification */}
       {toast && (
@@ -433,11 +492,16 @@ export default function CardsPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 tracking-tight font-display">My Media</h1>
-          <p className="text-slate-600 text-xs sm:text-sm">Kelola profil, tautan interaktif, dan riwayat akses kartu NFC & QR kamu.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 tracking-tight font-display flex items-center gap-2.5">
+            <CreditCard className="text-ony-blue shrink-0" size={28} />
+            Media & Kartu Saya
+          </h1>
+          <p className="text-slate-600 text-xs sm:text-sm">
+            Kelola ribuan kartu NFC & QR, link interaktif, serta analytics tap secara responsif & instan.
+          </p>
         </div>
 
         {selected && (
@@ -447,13 +511,66 @@ export default function CardsPage() {
               setModalError(null)
               setAddingLink(true)
             }}
-            className="btn-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold shadow-sm self-start sm:self-auto"
+            className="btn-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold shadow-sm self-start md:self-auto shrink-0"
           >
             <Plus size={16} />
             Tambah Link Baru
           </button>
         )}
       </div>
+
+      {/* Executive Quick Stats Bar */}
+      {safeCards.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-ony-blue flex items-center justify-center shrink-0 border border-blue-100">
+              <Layers size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Media</div>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 font-display truncate">
+                {safeCards.length.toLocaleString('id-ID')}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+              <Zap size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Interaksi</div>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 font-display truncate">
+                {totalTaps.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">taps</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+              <CheckCircle2 size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status Aktif</div>
+              <div className="text-lg sm:text-xl font-bold text-slate-900 font-display truncate">
+                {activeCardsCount.toLocaleString('id-ID')}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+              <Star size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Kartu Dipilih</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate font-display">
+                {selected?.card_name || 'Belum dipilih'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {safeCards.length === 0 ? (
         <div className="card-surface p-8 sm:p-12 text-center bg-white border border-slate-200 shadow-sm rounded-2xl">
@@ -466,53 +583,171 @@ export default function CardsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
-          {/* Left: Card Selection List */}
-          <div className="space-y-3 min-w-0">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Daftar Media ({safeCards.length})</div>
-            {safeCards.map(card => {
-              const CardIcon = MEDIA_ICONS[card.media_type] ?? CreditCard
-              const isSelected = selected?.id === card.id
-              return (
-                <button
-                  key={card.id}
-                  onClick={() => { setSelected(card); setActiveTab('editor'); }}
-                  className={cn(
-                    'w-full text-left p-3.5 sm:p-4 rounded-xl border transition-all shadow-sm flex items-center gap-3.5 min-w-0',
-                    isSelected
-                      ? 'bg-blue-50/90 border-blue-300 text-slate-900 font-semibold ring-2 ring-blue-500/20'
-                      : 'bg-white hover:border-blue-200 text-slate-700 border-slate-200'
-                  )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0 items-start">
+          
+          {/* Left Sidebar: Scalable Card Search & Paginated Selector List (4 Columns) */}
+          <div className="lg:col-span-4 space-y-3.5 min-w-0">
+            <div className="card-surface p-3.5 sm:p-4 bg-white border border-slate-200/90 shadow-xs rounded-2xl space-y-3">
+              
+              <div className="flex items-center justify-between">
+                <div className="text-slate-900 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-display">
+                  <SlidersHorizontal size={14} className="text-ony-blue" />
+                  Daftar Media ({filteredCards.length})
+                </div>
+                {cards.length > filteredCards.length && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setFilterMediaType('all')
+                      setFilterMode('all')
+                    }}
+                    className="text-[11px] text-ony-blue font-bold hover:underline"
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama, kode ONY, atau URL..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-ony-blue/20 focus:border-ony-blue transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Controls Row */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* Media Type Filter */}
+                <select
+                  value={filterMediaType}
+                  onChange={e => setFilterMediaType(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-slate-700 focus:outline-none focus:border-ony-blue"
                 >
-                  <div className={cn(
-                    'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border',
-                    isSelected ? 'bg-ony-blue text-white border-blue-600' : 'bg-slate-50 text-slate-700 border-slate-200'
-                  )}>
-                    <CardIcon size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate text-slate-900 font-display">{card.card_name}</div>
-                    <div className="text-[11px] sm:text-xs text-slate-500 truncate">{MEDIA_TYPE_LABELS[card.media_type]} · {card.activation_code}</div>
-                  </div>
-                  <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase shrink-0', STATUS_COLORS[card.status])}>
-                    {card.status}
-                  </span>
+                  <option value="all">Semua Tipe Media</option>
+                  <option value="nfc_card">NFC Card</option>
+                  <option value="nfc_sticker">NFC Sticker</option>
+                  <option value="qr_standee">QR Standee</option>
+                  <option value="qr_keychain">QR Keychain</option>
+                  <option value="digital_qr">Digital QR</option>
+                </select>
+
+                {/* Sort By Filter */}
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as 'newest' | 'most_taps' | 'name')}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-slate-700 focus:outline-none focus:border-ony-blue"
+                >
+                  <option value="newest">Terbaru</option>
+                  <option value="most_taps">Tap Terbanyak</option>
+                  <option value="name">Nama (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Scalable Paginated Cards List */}
+            <div className="space-y-2.5 min-w-0">
+              {paginatedCards.length === 0 ? (
+                <div className="p-8 text-center bg-white rounded-2xl border border-slate-200/90 text-slate-400 text-xs">
+                  Tidak ada kartu yang cocok dengan pencarian kamu.
+                </div>
+              ) : (
+                paginatedCards.map(card => {
+                  const CardIcon = MEDIA_ICONS[card.media_type] ?? CreditCard
+                  const isSelected = selected?.id === card.id
+                  return (
+                    <button
+                      key={card.id}
+                      onClick={() => { setSelected(card); setActiveTab('editor'); }}
+                      className={cn(
+                        'w-full text-left p-3 sm:p-3.5 rounded-2xl border transition-all shadow-2xs flex items-center gap-3 min-w-0 cursor-pointer relative group',
+                        isSelected
+                          ? 'bg-blue-50/90 border-blue-400/80 text-slate-900 font-semibold ring-2 ring-blue-500/20 shadow-xs'
+                          : 'bg-white hover:border-blue-300 text-slate-700 border-slate-200/90 hover:shadow-xs'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all',
+                        isSelected ? 'bg-ony-blue text-white border-blue-600 shadow-xs' : 'bg-slate-50 text-slate-700 border-slate-200 group-hover:border-blue-200'
+                      )}>
+                        <CardIcon size={18} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-xs sm:text-sm truncate text-slate-900 font-display flex items-center gap-1.5">
+                          <span className="truncate">{card.card_name}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                          <span>{MEDIA_TYPE_LABELS[card.media_type] || card.media_type}</span>
+                          <span>·</span>
+                          <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded">{card.activation_code}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={cn('text-[9px] px-1.5 py-0.5 rounded-md border font-bold uppercase', STATUS_COLORS[card.status])}>
+                          {card.status}
+                        </span>
+                        <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                          <Zap size={10} className="text-amber-500" />
+                          {card.total_taps ?? 0} taps
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Pagination Controls for Selector */}
+            {totalCardsPages > 1 && (
+              <div className="flex items-center justify-between px-2 py-1.5 bg-white border border-slate-200/90 rounded-xl text-xs">
+                <button
+                  onClick={() => setCardsPage(p => Math.max(1, p - 1))}
+                  disabled={cardsPage === 1}
+                  className="p-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
                 </button>
-              )
-            })}
+
+                <span className="text-[11px] font-bold text-slate-600">
+                  Halaman {cardsPage} / {totalCardsPages}
+                </span>
+
+                <button
+                  onClick={() => setCardsPage(p => Math.min(totalCardsPages, p + 1))}
+                  disabled={cardsPage >= totalCardsPages}
+                  className="p-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Right: Card Configuration Editor */}
+          {/* Right Main Panel: Card Configuration & Management (8 Columns) */}
           {selected && (
-            <div className="lg:col-span-2 space-y-6 min-w-0">
+            <div className="lg:col-span-8 space-y-6 min-w-0">
               
-              {/* Header Navigation Tabs */}
+              {/* Card Editor Header Navigation Tabs */}
               <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setActiveTab('editor')}
                     className={cn(
-                      'px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
+                      'px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
                       activeTab === 'editor'
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:text-slate-900'
@@ -523,7 +758,7 @@ export default function CardsPage() {
                   <button
                     onClick={() => setActiveTab('logs')}
                     className={cn(
-                      'px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
+                      'px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
                       activeTab === 'logs'
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:text-slate-900'
@@ -537,7 +772,7 @@ export default function CardsPage() {
                   href={`/c/${selected.activation_code}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-ony-blue text-xs font-bold hover:underline bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shrink-0"
+                  className="flex items-center gap-1.5 text-ony-blue text-xs font-bold hover:underline bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 shrink-0"
                 >
                   <Eye size={14} /> Lihat Profil
                 </a>
@@ -546,7 +781,7 @@ export default function CardsPage() {
               {activeTab === 'editor' ? (
                 <>
                   {/* Profile Section: Name & Avatar */}
-                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display flex items-center gap-2">
                       <User2 size={16} className="text-ony-blue" />
                       Identitas Profil Publik
@@ -600,15 +835,15 @@ export default function CardsPage() {
                     <button
                       onClick={saveProfile}
                       disabled={savingProfile}
-                      className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-xs font-bold shadow-sm"
+                      className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-xs font-bold shadow-xs cursor-pointer"
                     >
                       <Save size={14} />
                       {savingProfile ? 'Menyimpan...' : 'Simpan Profil'}
                     </button>
                   </div>
 
-                  {/* Card Settings (Manual Save Only) */}
-                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                  {/* Card Settings */}
+                  <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 mb-4 font-display">Informasi & Mode Respons Kartu</h2>
 
                     <div className="space-y-4 sm:space-y-5">
@@ -625,7 +860,7 @@ export default function CardsPage() {
                       {/* Mode Selection */}
                       <div>
                         <label className="text-slate-700 text-xs mb-2 block font-semibold">Modus Respons Tap NFC / Scan QR</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200 min-w-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 p-1.5 bg-slate-100/80 rounded-xl border border-slate-200 min-w-0">
                           {/* 1. Profile Mode */}
                           <button
                             type="button"
@@ -633,7 +868,7 @@ export default function CardsPage() {
                             className={cn(
                               'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
                               selected.mode === 'profile'
-                                ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
+                                ? 'bg-white text-ony-blue shadow-xs border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
@@ -650,7 +885,7 @@ export default function CardsPage() {
                             className={cn(
                               'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
                               selected.mode === 'direct'
-                                ? 'bg-white text-ony-blue shadow-sm border border-slate-200'
+                                ? 'bg-white text-ony-blue shadow-xs border border-slate-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
@@ -667,7 +902,7 @@ export default function CardsPage() {
                             className={cn(
                               'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
                               (selected.mode === 'google_review' || selected.mode === 'review')
-                                ? 'bg-white text-amber-600 shadow-sm border border-amber-200'
+                                ? 'bg-white text-amber-600 shadow-xs border border-amber-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
                           >
@@ -733,7 +968,7 @@ export default function CardsPage() {
                       <button
                         onClick={saveCardSettings}
                         disabled={savingCard}
-                        className="btn-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-bold shadow-md"
+                        className="btn-primary flex items-center justify-center gap-2 w-full py-3 text-sm font-bold shadow-xs cursor-pointer"
                       >
                         <Save size={16} />
                         {savingCard ? 'Menyimpan Perubahan...' : 'Simpan Perubahan Kartu'}
@@ -759,10 +994,10 @@ export default function CardsPage() {
                   </div>
 
                   {/* Links List */}
-                  <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl">
+                  <div className="card-surface p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl">
                     <div className="flex items-center justify-between mb-5">
                       <div>
-                        <h2 className="text-base font-bold text-slate-900">Kelola Link Tautan ({safeLinks.length})</h2>
+                        <h2 className="text-base font-bold text-slate-900 font-display">Kelola Link Tautan ({safeLinks.length})</h2>
                         <p className="text-slate-500 text-xs">Link ini akan muncul pada halaman profil publik kartu ini.</p>
                       </div>
 
@@ -772,7 +1007,7 @@ export default function CardsPage() {
                           setModalError(null)
                           setAddingLink(true)
                         }}
-                        className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 font-bold"
+                        className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 font-bold cursor-pointer"
                       >
                         <Plus size={14} />
                         Tambah Link
@@ -811,7 +1046,7 @@ export default function CardsPage() {
                               <button
                                 onClick={() => toggleLinkActive(link)}
                                 className={cn(
-                                  'p-1.5 rounded-lg border transition-all text-xs font-semibold',
+                                  'p-1.5 rounded-lg border transition-all text-xs font-semibold cursor-pointer',
                                   link.is_active
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                     : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
@@ -826,7 +1061,7 @@ export default function CardsPage() {
                                   setEditingLink(link)
                                   setModalError(null)
                                 }}
-                                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all"
+                                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
                                 title="Edit Link"
                               >
                                 <Edit3 size={14} />
@@ -834,7 +1069,7 @@ export default function CardsPage() {
 
                               <button
                                 onClick={() => deleteLink(link.id)}
-                                className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 transition-all"
+                                className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 transition-all cursor-pointer"
                                 title="Hapus Link"
                               >
                                 <Trash2 size={14} />
@@ -853,7 +1088,7 @@ export default function CardsPage() {
                               setModalError(null)
                               setAddingLink(true)
                             }}
-                            className="btn-ghost text-xs py-1.5 px-3 border-blue-200 text-ony-blue hover:bg-blue-50"
+                            className="btn-ghost text-xs py-1.5 px-3 border-blue-200 text-ony-blue hover:bg-blue-50 cursor-pointer"
                           >
                             + Tambah Link Pertama
                           </button>
@@ -864,7 +1099,7 @@ export default function CardsPage() {
                 </>
               ) : (
                 /* Today's Tap Activity Logs */
-                <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-sm rounded-2xl min-w-0">
+                <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-2">
                     <div>
                       <h2 className="text-sm sm:text-base font-bold text-slate-900 font-display">Riwayat Tap NFC & QR Scan Hari Ini</h2>
@@ -874,7 +1109,7 @@ export default function CardsPage() {
                     <button
                       onClick={loadCardDetails}
                       disabled={loadingLogs}
-                      className="flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto"
+                      className="flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto cursor-pointer"
                     >
                       <RefreshCw size={12} className={cn(loadingLogs && 'animate-spin')} /> Refresh Log
                     </button>
@@ -930,7 +1165,7 @@ export default function CardsPage() {
                             <button
                               onClick={() => setLogsPage(p => Math.max(1, p - 1))}
                               disabled={logsPage === 1}
-                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all"
+                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all cursor-pointer"
                             >
                               Sebelumnya
                             </button>
@@ -942,7 +1177,7 @@ export default function CardsPage() {
                             <button
                               onClick={() => setLogsPage(p => Math.min(Math.ceil(logs.length / LOGS_PER_PAGE), p + 1))}
                               disabled={logsPage >= Math.ceil(logs.length / LOGS_PER_PAGE)}
-                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all"
+                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all cursor-pointer"
                             >
                               Berikutnya
                             </button>
@@ -959,12 +1194,12 @@ export default function CardsPage() {
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* ✨ CLEAN & MINIMAL SHADCN DIALOG: TAMBAH LINK BARU         */}
+      {/* ✨ CLEAN SHADCN DIALOG: TAMBAH LINK BARU                   */}
       {/* ────────────────────────────────────────────────────────── */}
       <Dialog open={addingLink} onOpenChange={setAddingLink}>
         <DialogContent className="max-w-md bg-white border-slate-200 shadow-xl rounded-2xl p-6">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-lg font-bold text-slate-900">Tambah Link Tautan Baru</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-slate-900 font-display">Tambah Link Tautan Baru</DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
               Isi informasi link yang ingin ditampilkan pada halaman profil kamu.
             </DialogDescription>
@@ -1016,14 +1251,14 @@ export default function CardsPage() {
           <DialogFooter className="gap-2 sm:gap-0 mt-6">
             <button
               onClick={() => setAddingLink(false)}
-              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600"
+              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600 cursor-pointer"
             >
               Batal
             </button>
             <button
               onClick={handleAddLink}
               disabled={submittingLink}
-              className="btn-primary py-2 px-5 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="btn-primary py-2 px-5 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               {submittingLink ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
               Simpan Link
@@ -1033,12 +1268,12 @@ export default function CardsPage() {
       </Dialog>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* ✨ CLEAN & MINIMAL SHADCN DIALOG: EDIT LINK                */}
+      {/* ✨ CLEAN SHADCN DIALOG: EDIT LINK                          */}
       {/* ────────────────────────────────────────────────────────── */}
       <Dialog open={!!editingLink} onOpenChange={open => !open && setEditingLink(null)}>
         <DialogContent className="max-w-md bg-white border-slate-200 shadow-xl rounded-2xl p-6">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-lg font-bold text-slate-900">Edit Link Tautan</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-slate-900 font-display">Edit Link Tautan</DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
               Perbarui judul, target URL, atau tipe ikon link ini.
             </DialogDescription>
@@ -1087,11 +1322,11 @@ export default function CardsPage() {
           )}
 
           <DialogFooter className="gap-2 sm:gap-0 mt-6">
-            <button onClick={() => setEditingLink(null)} className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600">Batal</button>
+            <button onClick={() => setEditingLink(null)} className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600 cursor-pointer">Batal</button>
             <button
               onClick={handleUpdateLink}
               disabled={submittingLink}
-              className="btn-primary py-2 px-5 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="btn-primary py-2 px-5 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               {submittingLink ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
               Update Link
@@ -1128,7 +1363,7 @@ export default function CardsPage() {
           <DialogFooter className="gap-2 sm:gap-0 mt-2">
             <button
               onClick={() => setDeletingCard(null)}
-              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600"
+              className="btn-ghost py-2 px-4 text-xs font-semibold text-slate-600 cursor-pointer"
             >
               Batal
             </button>

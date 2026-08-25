@@ -76,11 +76,52 @@ export default function ClaimPage({
   const handleDirectClaim = async () => {
     setClaimingOwner(true)
     setClaimOwnerError(null)
+
+    // Check if there are stored session values from OAuth redirect
+    const storedPurpose = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_purpose_${code}`) as 'business_card' | 'google_review' | 'custom_redirect' | null : null
+    const storedReviewUrl = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_review_url_${code}`) : null
+    const storedRedirectUrl = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_redirect_url_${code}`) : null
+
+    const activePurpose = storedPurpose || cardPurpose
+    let targetUrl = activePurpose === 'google_review' ? (googleMapsUrl || storedReviewUrl || '') :
+                    activePurpose === 'custom_redirect' ? (customRedirectUrl || storedRedirectUrl || '') : ''
+
+    // Strict URL validation if purpose is NOT business_card (profile)
+    if (activePurpose === 'google_review' && !targetUrl.trim()) {
+      setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengklaim kartu.')
+      setClaimingOwner(false)
+      return
+    }
+    if (activePurpose === 'custom_redirect' && !targetUrl.trim()) {
+      setClaimOwnerError('Wajib memasukkan URL tujuan redirect sebelum mengklaim kartu.')
+      setClaimingOwner(false)
+      return
+    }
+
+    // Auto format 5-Star review link if raw maps link was provided and hasn't been generated yet
+    if (activePurpose === 'google_review' && targetUrl && !targetUrl.includes('writereview?placeid=')) {
+      try {
+        const genRes = await fetch('/api/tools/google-review-generator', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: targetUrl }),
+        })
+        const genData = await genRes.json()
+        if (genData.success && genData.reviewUrl) {
+          targetUrl = genData.reviewUrl
+        }
+      } catch (_) {}
+    }
+
     try {
       const res = await fetch('/api/cards/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({
+          code,
+          purpose: activePurpose,
+          redirectUrl: targetUrl,
+        }),
       })
       const data = await res.json()
       if (!res.ok || data.error) {
@@ -88,6 +129,13 @@ export default function ClaimPage({
         setClaimingOwner(false)
         return
       }
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(`ony_purpose_${code}`)
+        sessionStorage.removeItem(`ony_review_url_${code}`)
+        sessionStorage.removeItem(`ony_redirect_url_${code}`)
+      }
+
       // Success! Redirect to dashboard
       window.location.href = `/dashboard?claimed=${code}`
     } catch (err: any) {
@@ -95,6 +143,18 @@ export default function ClaimPage({
       setClaimingOwner(false)
     }
   }
+
+  // Load any stored session values on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const p = sessionStorage.getItem(`ony_purpose_${code}`) as 'business_card' | 'google_review' | 'custom_redirect' | null
+      const r = sessionStorage.getItem(`ony_review_url_${code}`)
+      const c = sessionStorage.getItem(`ony_redirect_url_${code}`)
+      if (p) setCardPurpose(p)
+      if (r) setGoogleMapsUrl(r)
+      if (c) setCustomRedirectUrl(c)
+    }
+  }, [code])
 
   // Trigger auto-claim if user returned authenticated from Google login with autoClaim param
   useEffect(() => {
@@ -211,12 +271,22 @@ export default function ClaimPage({
       return
     }
 
+    if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
+      setSellerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan kartu.')
+      return
+    }
+
+    if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
+      setSellerError('Wajib memasukkan URL tujuan redirect sebelum mengaktifkan kartu.')
+      return
+    }
+
     setSubmittingSeller(true)
 
     try {
       // If user pasted a short google maps link and hasn't clicked generate yet, auto-convert it first
       let finalReviewUrl = googleMapsUrl
-      if (cardPurpose === 'google_review' && googleMapsUrl && (googleMapsUrl.includes('maps.app.goo.gl') || googleMapsUrl.includes('goo.gl/maps'))) {
+      if (cardPurpose === 'google_review' && googleMapsUrl && !googleMapsUrl.includes('writereview?placeid=')) {
         try {
           const genRes = await fetch('/api/tools/google-review-generator', {
             method: 'POST',
@@ -479,6 +549,123 @@ export default function ClaimPage({
                         </div>
                       </div>
 
+                      <p className="text-slate-600 text-xs sm:text-sm leading-relaxed text-center">
+                        Pilih tujuan kartu ini, lalu klik klaim untuk mengaktifkannya ke akun kamu.
+                      </p>
+
+                      {/* Step 1: Choose purpose */}
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 font-display">
+                          Tujuan Kartu
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            {
+                              value: 'business_card',
+                              icon: CreditCard,
+                              label: 'Business Card',
+                              desc: 'Profil & bio link',
+                              color: 'border-blue-300 bg-blue-50 text-ony-blue',
+                              inactive: 'border-slate-200 bg-white text-slate-600',
+                            },
+                            {
+                              value: 'google_review',
+                              icon: MapPin,
+                              label: 'Google Review',
+                              desc: 'Ulasan Maps',
+                              color: 'border-amber-300 bg-amber-50 text-amber-600',
+                              inactive: 'border-slate-200 bg-white text-slate-600',
+                            },
+                            {
+                              value: 'custom_redirect',
+                              icon: Link2,
+                              label: 'Custom URL',
+                              desc: 'Redirect bebas',
+                              color: 'border-purple-300 bg-purple-50 text-purple-600',
+                              inactive: 'border-slate-200 bg-white text-slate-600',
+                            },
+                          ] as const).map(({ value, icon: Icon, label, desc, color, inactive }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setCardPurpose(value)}
+                              className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border-2 transition-all font-display cursor-pointer ${
+                                cardPurpose === value ? color : inactive
+                              }`}
+                            >
+                              <Icon size={18} />
+                              <span className="font-extrabold text-[11px]">{label}</span>
+                              <span className="text-[10px] leading-tight opacity-70">{desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Step 2: Conditional URL inputs */}
+                      {cardPurpose === 'google_review' && (
+                        <div className="animate-in fade-in duration-150 space-y-2">
+                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
+                            Link Google Maps Bisnis
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                              <MapPin size={15} />
+                            </div>
+                            <input
+                              type="url"
+                              placeholder="https://maps.app.goo.gl/..."
+                              value={googleMapsUrl}
+                              onChange={(e) => {
+                                setGoogleMapsUrl(e.target.value)
+                                setReviewLinkSuccessNote(null)
+                              }}
+                              className="w-full pl-10 pr-24 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateReviewLink()}
+                              disabled={generatingReviewLink || !googleMapsUrl}
+                              className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-ony-gradient text-white rounded-lg font-bold text-[11px] hover:opacity-95 disabled:opacity-50 transition-all flex items-center gap-1 font-display shadow-xs cursor-pointer"
+                            >
+                              {generatingReviewLink ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                              <span>Generate</span>
+                            </button>
+                          </div>
+                          {reviewLinkSuccessNote ? (
+                            <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle2 size={13} /> {reviewLinkSuccessNote}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-slate-500 leading-normal">
+                              Paste link Google Maps bisnis kamu, klik <strong>Generate</strong> — sistem auto-ubah ke link ulasan langsung.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {cardPurpose === 'custom_redirect' && (
+                        <div className="animate-in fade-in duration-150 space-y-2">
+                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
+                            URL Tujuan Redirect
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                              <Link2 size={15} />
+                            </div>
+                            <input
+                              type="url"
+                              placeholder="https://wa.me/628... atau URL apapun"
+                              value={customRedirectUrl}
+                              onChange={(e) => setCustomRedirectUrl(e.target.value)}
+                              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-500 leading-normal">
+                            Setiap orang yang tap/scan kartu akan langsung diarahkan ke URL ini — WhatsApp, website, Instagram, Tokopedia, dll.
+                          </p>
+                        </div>
+                      )}
+
                       {claimOwnerError && (
                         <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
                           <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -635,14 +822,35 @@ export default function ClaimPage({
                         </div>
                       )}
 
+                      {claimOwnerError && (
+                        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5 text-left">
+                          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                          <span>{claimOwnerError}</span>
+                        </div>
+                      )}
+
                       {/* Step 3: Login Google */}
                       <Link
                         id="claim-google-btn"
                         href={`/login?callbackUrl=${encodeURIComponent(googleLoginCallbackUrl)}&claim=${code}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          setClaimOwnerError(null)
+                          if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
+                            e.preventDefault()
+                            setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan dengan Google.')
+                            return
+                          }
+                          if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
+                            e.preventDefault()
+                            setClaimOwnerError('Wajib memasukkan URL tujuan redirect sebelum mengaktifkan dengan Google.')
+                            return
+                          }
                           // Store purpose & review URL to use after OAuth redirect
-                          sessionStorage.setItem(`ony_purpose_${code}`, cardPurpose)
-                          if (googleMapsUrl) sessionStorage.setItem(`ony_review_url_${code}`, googleMapsUrl)
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.setItem(`ony_purpose_${code}`, cardPurpose)
+                            if (googleMapsUrl) sessionStorage.setItem(`ony_review_url_${code}`, googleMapsUrl)
+                            if (customRedirectUrl) sessionStorage.setItem(`ony_redirect_url_${code}`, customRedirectUrl)
+                          }
                         }}
                         className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-800 font-bold text-sm shadow-xs transition-all duration-200 active:scale-[0.98] font-display"
                       >
