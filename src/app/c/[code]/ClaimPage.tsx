@@ -272,8 +272,11 @@ export default function ClaimPage({
         return
       }
 
-      if (data.orderId && typeof window !== 'undefined') {
-        sessionStorage.setItem(`last_order_${code}`, data.orderId)
+      if (typeof window !== 'undefined') {
+        if (data.orderId) sessionStorage.setItem(`last_order_${code}`, data.orderId)
+        sessionStorage.setItem(`ony_pay_email_${code}`, cleanEmail)
+        sessionStorage.setItem(`ony_pay_purpose_${code}`, payPurpose)
+        sessionStorage.setItem(`ony_pay_target_url_${code}`, targetUrl)
       }
 
       if (data.checkoutUrl) {
@@ -311,10 +314,21 @@ export default function ClaimPage({
     setPayFormError(null)
     try {
       const savedOrderId = typeof window !== 'undefined' ? sessionStorage.getItem(`last_order_${code}`) : null
+      const savedEmail = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_pay_email_${code}`) : null
+      const savedPurpose = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_pay_purpose_${code}`) : null
+      const savedTargetUrl = typeof window !== 'undefined' ? sessionStorage.getItem(`ony_pay_target_url_${code}`) : null
+
+      const payload = {
+        order_id: savedOrderId || undefined,
+        email: savedEmail || payEmail || undefined,
+        purpose: savedPurpose || payPurpose || undefined,
+        targetUrl: savedTargetUrl || (payPurpose === 'google_review' ? payGoogleMapsUrl : payPurpose === 'custom_redirect' ? payCustomRedirectUrl : '') || undefined,
+      }
+
       const res = await fetch(`/api/cards/${cardId || code}/check-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: savedOrderId || undefined }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (res.ok && data.settled) {
@@ -327,7 +341,7 @@ export default function ClaimPage({
           const retryRes = await fetch(`/api/cards/${cardId || code}/check-payment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: manualOrderId.trim() }),
+            body: JSON.stringify({ ...payload, order_id: manualOrderId.trim() }),
           })
           const retryData = await retryRes.json()
           if (retryRes.ok && retryData.settled) {

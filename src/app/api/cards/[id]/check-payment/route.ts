@@ -43,6 +43,9 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}))
     const requestOrderId = body?.order_id || body?.orderId
+    const fallbackEmail = body?.email
+    const fallbackPurpose = body?.purpose
+    const fallbackTargetUrl = body?.targetUrl
 
     const livePricing = await getLivePricing()
     const cashiApiKey = livePricing.cashi_api_key || process.env.CASHI_API_KEY || '7576626ad46a47041a3dc4b6e133d6abb33a8dbb58ae8b706731c5fffa806dfa'
@@ -109,9 +112,9 @@ export async function POST(
             .maybeSingle()
 
           const metadata = tx?.customer_details || {}
-          const email = metadata?.email
-          const purpose = metadata?.purpose || 'google_review'
-          const targetUrl = metadata?.targetUrl || null
+          const email = metadata?.email || fallbackEmail
+          const purpose = metadata?.purpose || fallbackPurpose || 'google_review'
+          const targetUrl = metadata?.targetUrl || fallbackTargetUrl
 
           let targetUserId = metadata?.userId || null
           if (!targetUserId && email) {
