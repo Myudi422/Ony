@@ -235,18 +235,73 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { cardId, action, value } = body
+  const { cardId, cardIds, action, value } = body
 
-  if (!cardId) {
-    return NextResponse.json({ error: 'cardId required' }, { status: 400 })
+  const idsToProcess = Array.isArray(cardIds) ? cardIds : (cardId ? [cardId] : [])
+  if (idsToProcess.length === 0) {
+    return NextResponse.json({ error: 'cardId or cardIds required' }, { status: 400 })
+  }
+
+  if (action === 'payment_status') {
+    const isUnpaid = value === 'unpaid'
+    if (isUnpaid) {
+      const { data, error } = await supabaseAdmin
+        .from('cards')
+        .update({
+          redirect_url: 'UNPAID',
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', idsToProcess)
+        .select()
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      try {
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          admin_id: (token?.userId as string) ?? 'ADMIN',
+          action: 'UPDATE_PAYMENT_STATUS',
+          target_type: 'CARD',
+          target_id: idsToProcess.join(','),
+          details: { payment_status: 'unpaid' },
+        })
+      } catch (_) {}
+
+      return NextResponse.json({ success: true, updated: data?.length ?? 0 })
+    } else {
+      // Set to paid: clear 'UNPAID' redirect_url placeholder
+      const { data, error } = await supabaseAdmin
+        .from('cards')
+        .update({
+          redirect_url: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', idsToProcess)
+        .eq('redirect_url', 'UNPAID')
+        .select()
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      try {
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          admin_id: (token?.userId as string) ?? 'ADMIN',
+          action: 'UPDATE_PAYMENT_STATUS',
+          target_type: 'CARD',
+          target_id: idsToProcess.join(','),
+          details: { payment_status: 'paid' },
+        })
+      } catch (_) {}
+
+      return NextResponse.json({ success: true, updated: data?.length ?? 0 })
+    }
   }
 
   if (action === 'unbind') {
+    const targetCardId = idsToProcess[0]
     // 1. Get existing card owner ID before unbinding
     const { data: existingCard } = await supabaseAdmin
       .from('cards')
       .select('user_id')
-      .eq('id', cardId)
+      .eq('id', targetCardId)
       .single()
 
     const oldUserId = existingCard?.user_id
@@ -263,17 +318,17 @@ export async function PATCH(req: NextRequest) {
         total_taps: 0,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', cardId)
+      .eq('id', targetCardId)
       .select()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // 3. Purge all links and tap logs for this card safely
-    await supabaseAdmin.from('links').delete().eq('card_id', cardId)
+    await supabaseAdmin.from('links').delete().eq('card_id', targetCardId)
     if (oldUserId) {
       await supabaseAdmin.from('links').delete().eq('user_id', oldUserId)
     }
-    await supabaseAdmin.from('tap_logs').delete().eq('card_id', cardId)
+    await supabaseAdmin.from('tap_logs').delete().eq('card_id', targetCardId)
 
     // Log audit
     try {
@@ -281,7 +336,7 @@ export async function PATCH(req: NextRequest) {
         admin_id: (token?.userId as string) ?? 'ADMIN',
         action: 'UNBIND_CARD',
         target_type: 'CARD',
-        target_id: cardId,
+        target_id: targetCardId,
         details: { old_user_id: oldUserId, links_deleted: true, tap_logs_deleted: true },
       })
     } catch (_) {}
@@ -297,7 +352,7 @@ export async function PATCH(req: NextRequest) {
         status: newStatus,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', cardId)
+      .in('id', idsToProcess)
       .select()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -307,12 +362,12 @@ export async function PATCH(req: NextRequest) {
         admin_id: (token?.userId as string) ?? 'ADMIN',
         action: 'UPDATE_CARD_STATUS',
         target_type: 'CARD',
-        target_id: cardId,
+        target_id: idsToProcess.join(','),
         details: { status: newStatus },
       })
     } catch (_) {}
 
-    return NextResponse.json({ success: true, card: data?.[0] })
+    return NextResponse.json({ success: true, updated: data?.length ?? 0 })
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

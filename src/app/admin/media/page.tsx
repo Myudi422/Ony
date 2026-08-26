@@ -475,6 +475,28 @@ export default function AdminMediaPage() {
     loadCards()
   }
 
+  const updatePaymentStatus = async (target: string | string[], value: 'paid' | 'unpaid') => {
+    const cardIds = Array.isArray(target) ? target : [target]
+    if (cardIds.length === 0) return
+    try {
+      const res = await fetch('/api/admin/media', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardIds, action: 'payment_status', value }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        showToast(`Status payment ${cardIds.length} media diperbarui ke ${value === 'paid' ? 'BAYAR (Sudah Beli)' : 'Blangko (Unpaid)'}.`)
+        loadCards()
+        loadStats()
+      } else {
+        alert(`Gagal update status payment: ${data.error || 'Error'}`)
+      }
+    } catch (err: any) {
+      alert(`Gagal update: ${err?.message || 'Error'}`)
+    }
+  }
+
   const exportCSV = () => {
     const rows = ['Code,NFC_Link,Type,Payment_Option,Status,Owner,Taps,Created']
     cards.forEach(c => {
@@ -875,6 +897,20 @@ export default function AdminMediaPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => updatePaymentStatus(selectedIds, 'paid')}
+              className="flex items-center gap-1.5 text-xs text-emerald-950 bg-emerald-400 hover:bg-emerald-300 px-3.5 py-2 rounded-xl transition-all shadow-sm font-bold"
+              title="Ubah status seluruh media terpilih menjadi Sudah Bayar (BAYAR)"
+            >
+              <CheckCircle2 size={13} /> Set BAYAR ({selectedIds.length})
+            </button>
+            <button
+              onClick={() => updatePaymentStatus(selectedIds, 'unpaid')}
+              className="flex items-center gap-1.5 text-xs text-amber-950 bg-amber-400 hover:bg-amber-300 px-3.5 py-2 rounded-xl transition-all shadow-sm font-bold"
+              title="Ubah status seluruh media terpilih menjadi Blangko (Unpaid)"
+            >
+              <Tag size={13} /> Set Blangko ({selectedIds.length})
+            </button>
+            <button
               onClick={() => bulkCopyLinks()}
               className="flex items-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-2 rounded-xl transition-all shadow-sm font-semibold"
               title="Salin semua URL NFC ke clipboard"
@@ -1043,10 +1079,22 @@ export default function AdminMediaPage() {
 
                     {/* Opsi Payment */}
                     <td className="px-4 py-3.5 text-center">
-                      {isUnpaid
-                        ? <span title="BLANK (belum bayar)"><X size={15} className="text-rose-500 mx-auto" /></span>
-                        : <span title="BAYAR"><Check size={15} className="text-emerald-600 mx-auto" /></span>
-                      }
+                      <button
+                        onClick={() => updatePaymentStatus(card.id, isUnpaid ? 'paid' : 'unpaid')}
+                        className={cn(
+                          'w-8 h-8 rounded-full border transition-all flex items-center justify-center mx-auto shadow-2xs hover:scale-110 active:scale-95 cursor-pointer',
+                          isUnpaid
+                            ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
+                        )}
+                        title={isUnpaid ? 'Belum Bayar (Blangko) — Klik untuk ubah ke BAYAR' : 'Sudah Bayar — Klik untuk ubah ke Blangko'}
+                      >
+                        {isUnpaid ? (
+                          <X size={16} className="text-rose-600 stroke-[2.5]" />
+                        ) : (
+                          <Check size={16} className="text-emerald-600 stroke-[2.5]" />
+                        )}
+                      </button>
                     </td>
 
                     {/* Status */}
