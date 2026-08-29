@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   Wifi, ArrowRight, CreditCard, Tag, Tv, Key, ShieldCheck, Zap,
   Link2, ShoppingCart, CheckCircle2, BarChart2, QrCode, RefreshCw, Sparkles,
-  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle
+  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle, PlayCircle, X, Maximize2
 } from 'lucide-react'
 
 const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = {
@@ -48,6 +48,29 @@ export default function ClaimPage({
   const [price, setPrice] = useState<number | null>(null)
   const [loadingPay, setLoadingPay] = useState(false)
   const isUnpaid = paymentStatus === 'unpaid'
+
+  // Tutorial Video Modal State & Ref
+  const [showTutorialModal, setShowTutorialModal] = useState(false)
+  const tutorialVideoRef = useRef<HTMLVideoElement>(null)
+
+  // Fullscreen / Landscape trigger for mobile devices
+  const handleFullscreenVideo = async () => {
+    const v = tutorialVideoRef.current
+    if (!v) return
+    try {
+      if (v.requestFullscreen) {
+        await v.requestFullscreen()
+      } else if ((v as any).webkitRequestFullscreen) {
+        await (v as any).webkitRequestFullscreen()
+      } else if ((v as any).webkitEnterFullscreen) {
+        ;(v as any).webkitEnterFullscreen()
+      }
+
+      if (screen.orientation && 'lock' in screen.orientation) {
+        await (screen.orientation as any).lock('landscape').catch(() => {})
+      }
+    } catch (_) {}
+  }
 
   // Tab State: 'owner' (Google Login) | 'seller' (Email activation by Seller)
   const [activeTab, setActiveTab] = useState<'owner' | 'seller'>('owner')
@@ -539,6 +562,17 @@ export default function ClaimPage({
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto">
               Kode Media: <span className="font-mono text-ony-blue font-bold px-2 py-0.5 rounded bg-blue-50 border border-blue-100">{code}</span>
             </p>
+
+            <div className="mt-3.5 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setShowTutorialModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 hover:shadow-lg hover:scale-[1.03] transition-all duration-200 cursor-pointer font-display"
+              >
+                <PlayCircle size={15} className="animate-pulse" />
+                <span>Lihat Video Tutorial Aktivasi</span>
+              </button>
+            </div>
           </div>
 
           {/* IF UNPAID: Educate on Ony Features & Show Payment */}
@@ -780,7 +814,7 @@ export default function ClaimPage({
               </div>
             </div>
           ) : (
-            /* IF PAID: 2 TABS (Login Owner vs Tab Seller) */
+            /* IF PAID: 2 TABS (Manage Sendiri vs Transfer ke Client) */
             <div>
               {/* Tab Navigation Switcher */}
               <div className="grid grid-cols-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/90 mb-6 gap-1">
@@ -797,7 +831,7 @@ export default function ClaimPage({
                   }`}
                 >
                   <UserCheck size={16} />
-                  <span>Login Owner</span>
+                  <span>Manage Sendiri</span>
                 </button>
 
                 <button
@@ -813,7 +847,7 @@ export default function ClaimPage({
                   }`}
                 >
                   <Store size={16} />
-                  <span>Tab Seller</span>
+                  <span>Transfer ke Client</span>
                 </button>
               </div>
 
@@ -990,7 +1024,7 @@ export default function ClaimPage({
                     /* IF USER IS NOT LOGGED IN YET — Purpose-first flow */
                     <div className="space-y-5">
                       <p className="text-slate-600 text-xs sm:text-sm leading-relaxed text-center">
-                        Pilih tujuan kartu ini, lalu login dengan Google untuk mengklaimnya ke akun kamu.
+                        Pilih tujuan kartu ini, lalu login dengan Google untuk mengklaim & mengelola kartu di Dashboard kamu.
                       </p>
 
                       {/* Step 1: Choose purpose */}
@@ -1114,48 +1148,53 @@ export default function ClaimPage({
                       )}
 
                       {/* Step 3: Login Google */}
-                      <Link
-                        id="claim-google-btn"
-                        href={`/login?callbackUrl=${encodeURIComponent(googleLoginCallbackUrl)}&claim=${code}`}
-                        onClick={(e) => {
-                          setClaimOwnerError(null)
-                          if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
-                            e.preventDefault()
-                            setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan dengan Google.')
-                            return
-                          }
-                          if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
-                            e.preventDefault()
-                            setClaimOwnerError('Wajib memasukkan URL tujuan redirect sebelum mengaktifkan dengan Google.')
-                            return
-                          }
-                          // Store purpose & review URL to use after OAuth redirect
-                          if (typeof window !== 'undefined') {
-                            sessionStorage.setItem(`ony_purpose_${code}`, cardPurpose)
-                            if (googleMapsUrl) sessionStorage.setItem(`ony_review_url_${code}`, googleMapsUrl)
-                            if (customRedirectUrl) sessionStorage.setItem(`ony_redirect_url_${code}`, customRedirectUrl)
-                          }
-                        }}
-                        className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-800 font-bold text-sm shadow-xs transition-all duration-200 active:scale-[0.98] font-display"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" className="shrink-0">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                        </svg>
-                        <span>Aktivasi dengan Google</span>
-                        <ArrowRight size={16} className="text-slate-400 ml-auto" />
-                      </Link>
+                      <div className="space-y-2">
+                        <Link
+                          id="claim-google-btn"
+                          href={`/login?callbackUrl=${encodeURIComponent(googleLoginCallbackUrl)}&claim=${code}`}
+                          onClick={(e) => {
+                            setClaimOwnerError(null)
+                            if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
+                              e.preventDefault()
+                              setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan dengan Google.')
+                              return
+                            }
+                            if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
+                              e.preventDefault()
+                              setClaimOwnerError('Wajib memasukkan URL tujuan redirect sebelum mengaktifkan dengan Google.')
+                              return
+                            }
+                            // Store purpose & review URL to use after OAuth redirect
+                            if (typeof window !== 'undefined') {
+                              sessionStorage.setItem(`ony_purpose_${code}`, cardPurpose)
+                              if (googleMapsUrl) sessionStorage.setItem(`ony_review_url_${code}`, googleMapsUrl)
+                              if (customRedirectUrl) sessionStorage.setItem(`ony_redirect_url_${code}`, customRedirectUrl)
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-800 font-bold text-sm shadow-xs transition-all duration-200 active:scale-[0.98] font-display"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" className="shrink-0">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                          </svg>
+                          <span>Login dengan Google</span>
+                          <ArrowRight size={16} className="text-slate-400 ml-auto" />
+                        </Link>
+                        <p className="text-[11px] text-slate-500 text-center leading-normal px-2">
+                          🔒 Hanya untuk autentikasi kelola kartu, <strong>tanpa mengambil data pribadi Google Anda.</strong>
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   {/* Owner Freedom Reassurance Banner */}
-                  <div className="mt-5 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+                  <div className="mt-4 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
                     <Sparkles size={16} className="text-ony-blue shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset Kapan Saja:</strong>
-                      Setelah diklaim, pemilik bebas memilih 3 mode respons (Profile, Direct, Review Maps), mengubah isi link, atau menghapus & reset kartu kapan saja melalui Dashboard.
+                      Setelah diklaim, Anda bebas mengedit link, memilih mode kartu (Review Maps, Profil, atau Custom URL), & reset data via Dashboard.
                     </div>
                   </div>
                 </div>
@@ -1221,7 +1260,7 @@ export default function ClaimPage({
                     <div>
                       <form onSubmit={handleSellerSubmit} className="space-y-4 text-left">
                       <p className="text-slate-600 text-xs leading-relaxed">
-                        Form khusus Seller / Agent untuk mengaktifkan kartu dan langsung mengklaimnya atas nama email pembeli/klien.
+                        Form khusus untuk mengaktifkan kartu dan langsung mentransfer kepemilikan atas nama email klien.
                       </p>
 
                       {sellerError && (
@@ -1234,7 +1273,7 @@ export default function ClaimPage({
                       {/* Email Input */}
                       <div>
                         <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
-                          Email Owner / Klien <span className="text-red-500">*</span>
+                          Email Klien / Penerima Kartu <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1376,8 +1415,16 @@ export default function ClaimPage({
           )}
         </div>
 
-        {/* Footer Admin WA Contact */}
-        <div className="mt-5 text-center">
+        {/* Footer Links */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowTutorialModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-blue-200 text-blue-700 hover:bg-blue-50/80 text-xs font-bold transition-all shadow-xs cursor-pointer font-display"
+          >
+            <PlayCircle size={15} className="text-ony-blue shrink-0" />
+            <span>Video Tutorial</span>
+          </button>
           <a
             href={`https://wa.me/6289654728249?text=${encodeURIComponent(`Halo Admin Ony, saya membutuhkan bantuan mengenai media dengan kode ${code}`)}`}
             target="_blank"
@@ -1385,11 +1432,83 @@ export default function ClaimPage({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 text-xs font-medium transition-all shadow-xs"
           >
             <MessageCircle size={15} className="text-emerald-500 shrink-0" />
-            <span>Kendala atau butuh bantuan?</span>
-            <span className="font-bold text-emerald-600 underline">Hubungi Admin WA</span>
+            <span>Kendala? Hubungi Admin WA</span>
           </a>
         </div>
       </div>
+
+      {/* Video Tutorial Popup Modal */}
+      {showTutorialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-800 bg-slate-900/90 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5 text-white font-extrabold text-xs sm:text-sm font-display truncate pr-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <PlayCircle size={17} />
+                </div>
+                <span className="truncate">Tutorial Aktivasi & Penggunaan Ony</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleFullscreenVideo}
+                  title="Putar Fullscreen / Landscape"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[11px] font-bold transition-all cursor-pointer font-display border border-blue-500/30"
+                >
+                  <Maximize2 size={13} />
+                  <span className="hidden sm:inline">Layar Penuh</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTutorialModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Video Player Container */}
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden shrink min-h-0">
+              <video
+                ref={tutorialVideoRef}
+                src="https://file.legalpilar.id/file/ccgnimex/tutorial.mp4"
+                controls
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+              >
+                Browser Anda tidak mendukung pemutaran video.
+              </video>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-3 sm:p-4 bg-slate-900 text-slate-400 text-xs border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+              <p className="text-[11px] leading-relaxed text-left text-slate-400 truncate">
+                Panduan singkat cara klaim & atur kartu via Dashboard.
+              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleFullscreenVideo}
+                  className="sm:hidden px-3 py-1.5 bg-blue-600/40 hover:bg-blue-600 text-blue-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 font-display cursor-pointer"
+                >
+                  <Maximize2 size={13} />
+                  <span>Fullscreen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTutorialModal(false)}
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all font-display cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
