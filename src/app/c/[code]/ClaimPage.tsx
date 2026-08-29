@@ -1415,16 +1415,8 @@ export default function ClaimPage({
           )}
         </div>
 
-        {/* Footer Links */}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowTutorialModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-blue-200 text-blue-700 hover:bg-blue-50/80 text-xs font-bold transition-all shadow-xs cursor-pointer font-display"
-          >
-            <PlayCircle size={15} className="text-ony-blue shrink-0" />
-            <span>Video Tutorial</span>
-          </button>
+        {/* Footer Admin WA Contact */}
+        <div className="mt-5 text-center">
           <a
             href={`https://wa.me/6289654728249?text=${encodeURIComponent(`Halo Admin Ony, saya membutuhkan bantuan mengenai media dengan kode ${code}`)}`}
             target="_blank"
@@ -1432,7 +1424,8 @@ export default function ClaimPage({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 text-xs font-medium transition-all shadow-xs"
           >
             <MessageCircle size={15} className="text-emerald-500 shrink-0" />
-            <span>Kendala? Hubungi Admin WA</span>
+            <span>Kendala atau butuh bantuan?</span>
+            <span className="font-bold text-emerald-600 underline">Hubungi Admin WA</span>
           </a>
         </div>
       </div>
@@ -1488,23 +1481,13 @@ export default function ClaimPage({
               <p className="text-[11px] leading-relaxed text-left text-slate-400 truncate">
                 Panduan singkat cara klaim & atur kartu via Dashboard.
               </p>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleFullscreenVideo}
-                  className="sm:hidden px-3 py-1.5 bg-blue-600/40 hover:bg-blue-600 text-blue-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 font-display cursor-pointer"
-                >
-                  <Maximize2 size={13} />
-                  <span>Fullscreen</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTutorialModal(false)}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all font-display cursor-pointer"
-                >
-                  Tutup
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowTutorialModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shrink-0 font-display cursor-pointer"
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>
