@@ -5,15 +5,16 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { Users, CreditCard, ShoppingBag, BarChart2, FileText, Home, ChevronRight, Loader2, DollarSign, Menu } from 'lucide-react'
+import { Users, CreditCard, ShoppingBag, BarChart2, FileText, Home, ChevronRight, Loader2, DollarSign, Menu, QrCode } from 'lucide-react'
 
 const ADMIN_NAV = [
-  { href: '/admin',           label: 'Overview',      icon: BarChart2 },
-  { href: '/admin/users',     label: 'Users',         icon: Users },
-  { href: '/admin/media',     label: 'Media',         icon: CreditCard },
-  { href: '/admin/pricing',   label: 'Harga Dinamis', icon: DollarSign },
-  { href: '/admin/orders',    label: 'Orders',        icon: ShoppingBag },
-  { href: '/admin/audit',     label: 'Audit Log',     icon: FileText },
+  { href: '/admin',              label: 'Overview',          icon: BarChart2 },
+  { href: '/admin/users',        label: 'Users',             icon: Users },
+  { href: '/admin/media',        label: 'Media',             icon: CreditCard },
+  { href: '/admin/qr-generator', label: 'QR & Card Custom', icon: QrCode },
+  { href: '/admin/pricing',      label: 'Harga Dinamis',     icon: DollarSign },
+  { href: '/admin/orders',       label: 'Orders',            icon: ShoppingBag },
+  { href: '/admin/audit',        label: 'Audit Log',         icon: FileText },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
