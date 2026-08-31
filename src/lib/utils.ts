@@ -29,12 +29,12 @@ export function generateActivationCode(length = 8): string {
 }
 
 export const MEDIA_TYPE_LABELS: Record<string, string> = {
-  nfc_qr:      'NFC + QR Smart Media',
-  nfc_card:    'NFC + QR Smart Media',
-  nfc_sticker: 'NFC + QR Smart Media',
-  qr_standee:  'NFC + QR Smart Media',
-  qr_keychain: 'NFC + QR Smart Media',
-  digital_qr:  'NFC + QR Smart Media',
+  nfc_qr:      'NFC Card',
+  nfc_card:    'NFC Card',
+  nfc_sticker: 'NFC Sticker',
+  qr_standee:  'QR Standee',
+  qr_keychain: 'QR Keychain',
+  digital_qr:  'Digital QR',
 }
 
 export const STATUS_COLORS: Record<string, string> = {

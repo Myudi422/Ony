@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight, ShoppingBag, Settings } from 'lucide-react'
+import { Wifi, BarChart2, CreditCard, QrCode, TrendingUp, ArrowRight, ShoppingBag, Settings, Tag, Tv, Key, Smartphone } from 'lucide-react'
 import Link from 'next/link'
 import { formatNumber } from '@/lib/utils'
 
@@ -45,8 +45,12 @@ export default function DashboardPage() {
     { label: 'Total Media', value: safeCards.length, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100' },
   ]
 
-  const MEDIA_ICONS: Record<string, string> = {
-    nfc_card: '💳', nfc_sticker: '🏷️', qr_standee: '🖼️', qr_keychain: '🔑', digital_qr: '📱',
+  const MEDIA_ICONS: Record<string, React.ElementType> = {
+    nfc_card: CreditCard,
+    nfc_sticker: Tag,
+    qr_standee: Tv,
+    qr_keychain: Key,
+    digital_qr: QrCode,
   }
 
   return (
@@ -89,23 +93,28 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 min-w-0">
-            {safeCards.slice(0, 3).map((card) => (
-              <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-4 sm:p-5 hover:border-blue-300 transition-all group shadow-xs bg-white min-w-0">
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{MEDIA_ICONS[card.media_type] ?? '📱'}</span>
-                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
-                    card.status === 'active' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-200'
-                  }`}>
-                    {card.status}
-                  </span>
-                </div>
-                <div className="text-slate-900 font-bold text-sm mb-1 group-hover:text-ony-blue transition-colors font-display truncate">{card.card_name}</div>
-                <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold">
-                  <Wifi size={12} className="text-ony-blue" />
-                  {formatNumber(card.total_taps)} interaksi
-                </div>
-              </Link>
-            ))}
+            {safeCards.slice(0, 3).map((card) => {
+              const CardIcon = MEDIA_ICONS[card.media_type] ?? CreditCard
+              return (
+                <Link key={card.id} href={`/dashboard/cards`} className="card-surface p-4 sm:p-5 hover:border-blue-300 transition-all group shadow-xs bg-white min-w-0">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-ony-blue border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-ony-blue group-hover:text-white transition-colors">
+                      <CardIcon size={20} />
+                    </div>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
+                      card.status === 'active' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-200'
+                    }`}>
+                      {card.status}
+                    </span>
+                  </div>
+                  <div className="text-slate-900 font-bold text-sm mb-1 group-hover:text-ony-blue transition-colors font-display truncate">{card.card_name}</div>
+                  <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold">
+                    <Wifi size={12} className="text-ony-blue" />
+                    {formatNumber(card.total_taps)} interaksi
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         )}
       </div>

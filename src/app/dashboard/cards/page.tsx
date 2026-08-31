@@ -592,7 +592,7 @@ export default function CardsPage() {
             Media & Kartu Saya
           </h1>
           <p className="text-slate-600 text-xs sm:text-sm">
-            Kelola ribuan kartu NFC & QR, link interaktif, serta analytics tap secara responsif & instan.
+            Kelola kartu, link profil, dan analitik interaksi.
           </p>
         </div>
 
@@ -764,27 +764,27 @@ export default function CardsPage() {
                       key={card.id}
                       onClick={() => { setSelected(card); setActiveTab('editor'); }}
                       className={cn(
-                        'w-full text-left p-3 sm:p-3.5 rounded-2xl border transition-all shadow-2xs flex items-center gap-3 min-w-0 cursor-pointer relative group',
+                        'w-full text-left p-3 rounded-2xl border transition-all flex items-center gap-3 min-w-0 cursor-pointer relative group',
                         isSelected
                           ? 'bg-blue-50/90 border-blue-400/80 text-slate-900 font-semibold ring-2 ring-blue-500/20 shadow-xs'
                           : 'bg-white hover:border-blue-300 text-slate-700 border-slate-200/90 hover:shadow-xs'
                       )}
                     >
                       <div className={cn(
-                        'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all',
+                        'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all',
                         isSelected ? 'bg-ony-blue text-white border-blue-600 shadow-xs' : 'bg-slate-50 text-slate-700 border-slate-200 group-hover:border-blue-200'
                       )}>
                         <CardIcon size={18} />
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-xs sm:text-sm truncate text-slate-900 font-display flex items-center gap-1.5">
-                          <span className="truncate">{card.card_name}</span>
+                        <div className="font-bold text-xs sm:text-sm truncate text-slate-900 font-display">
+                          {card.card_name}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
-                          <span>{MEDIA_TYPE_LABELS[card.media_type] || card.media_type}</span>
-                          <span>·</span>
-                          <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded">{card.activation_code}</span>
+                        <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5 font-medium">
+                          <span>{MEDIA_TYPE_LABELS[card.media_type] || 'NFC Card'}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-mono text-slate-600 font-semibold">{card.activation_code}</span>
                         </div>
                       </div>
 
