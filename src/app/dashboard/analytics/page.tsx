@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 
 interface Analytics {
-  totalTaps: number; totalClicks: number; nfcTaps: number; qrScans: number;
+  totalTaps: number; totalClicks: number; nfcTaps: number; qrScans: number; totalCards?: number;
   taps: { date: string; count: number }[]
 }
 
