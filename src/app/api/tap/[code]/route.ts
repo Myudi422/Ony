@@ -19,17 +19,14 @@ export async function POST(
     return NextResponse.json({ error: 'Card unavailable' }, { status: 403 })
   }
 
-  // Insert tap log
-  await supabaseAdmin.from('tap_logs').insert({
-    card_id: card.id,
-    access_method: method,
-    ip_address: ip,
-    user_agent: ua,
-    tapped_at: new Date().toISOString(),
+  // Increment total_taps counter without logging individual rows (conserve free tier storage)
+  await supabaseAdmin.rpc('increment_taps', { card_id: card.id }).then(async ({ error }) => {
+    if (error) {
+      const { data: c } = await supabaseAdmin.from('cards').select('total_taps').eq('id', card.id).maybeSingle()
+      const current = typeof c?.total_taps === 'number' ? c.total_taps : 0
+      await supabaseAdmin.from('cards').update({ total_taps: current + 1 }).eq('id', card.id)
+    }
   })
-
-  // Increment total_taps
-  await supabaseAdmin.rpc('increment_taps', { card_id: card.id }).then(() => {})
 
   return NextResponse.json({ success: true })
 }

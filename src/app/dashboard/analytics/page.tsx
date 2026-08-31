@@ -36,10 +36,9 @@ export default function AnalyticsPage() {
   }, [period])
 
   const metrics = [
-    { label: 'Total Interaksi', value: data?.totalTaps ?? 0, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-100', desc: 'Tap NFC + Scan QR' },
+    { label: 'Total Interaksi', value: data?.totalTaps ?? 0, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-100', desc: 'Tap NFC & Scan QR' },
     { label: 'Total Klik Link', value: data?.totalClicks ?? 0, icon: MousePointerClick, color: 'text-indigo-600', bg: 'bg-indigo-50 border border-indigo-100', desc: 'Link diklik pengunjung' },
-    { label: 'NFC Tap', value: data?.nfcTaps ?? 0, icon: Wifi, color: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Via chip NFC' },
-    { label: 'QR Scan', value: data?.qrScans ?? 0, icon: QrCode, color: 'text-purple-600', bg: 'bg-purple-50 border border-purple-100', desc: 'Via kode QR' },
+    { label: 'Total Media', value: data?.totalCards ?? 0, icon: Wifi, color: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Kartu & standee terhubung' },
   ]
 
   const chartData = Array.isArray(data?.taps) ? data.taps.map(d => ({
@@ -72,9 +71,9 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 min-w-0">
         {metrics.map(({ label, value, icon: Icon, color, bg, desc }) => (
-          <div key={label} className="card-surface p-3.5 sm:p-5 min-w-0">
+          <div key={label} className="card-surface p-4 sm:p-5 min-w-0">
             <div className={`w-9 h-9 sm:w-10 sm:h-10 ${bg} rounded-xl flex items-center justify-center mb-2.5`}>
               <Icon size={18} className={color} />
             </div>
@@ -96,8 +95,10 @@ export default function AnalyticsPage() {
         </div>
 
         {chartData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-slate-500 text-sm">
-            Belum ada data untuk periode ini.
+          <div className="h-48 flex flex-col items-center justify-center text-slate-400 text-xs space-y-1">
+            <TrendingUp size={24} className="text-slate-300 mb-1" />
+            <p className="font-semibold text-slate-600">Belum ada grafik tren harian pada periode ini</p>
+            <p className="text-slate-400 text-[11px]">Tren akan terbentuk secara otomatis saat pengunjung mengeklik link pada profil kartu kamu.</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
@@ -136,36 +137,23 @@ export default function AnalyticsPage() {
 
       {/* NFC vs QR Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
-        <div className="card-surface p-4 sm:p-6 min-w-0">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">Sumber Interaksi</h3>
-          <div className="space-y-3">
-            {[
-              { label: 'NFC Tap', value: data?.nfcTaps ?? 0, total: data?.totalTaps ?? 1, color: 'bg-ony-blue' },
-              { label: 'QR Scan', value: data?.qrScans ?? 0, total: data?.totalTaps ?? 1, color: 'bg-indigo-600' },
-            ].map(({ label, value, total, color }) => {
-              const pct = total > 0 ? Math.round((value / total) * 100) : 0
-              return (
-                <div key={label}>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-slate-600 font-medium">{label}</span>
-                    <span className="text-slate-900 font-bold">{pct}% ({formatNumber(value)})</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
-                    <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
+        <div className="card-surface p-4 sm:p-6 min-w-0 space-y-3">
+          <h3 className="text-sm font-bold text-slate-900 font-display">Performa & Kecepatan Pengalihan</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Seluruh statistik dihitung secara real-time untuk memberikan gambaran akurat mengenai interaksi media kamu tanpa mengorbankan kecepatan pengalihan kustom.
+          </p>
+          <div className="pt-2 flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 p-2.5 rounded-xl border border-blue-200">
+            <span>⚡ High Performance System</span>
           </div>
         </div>
 
         <div className="card-surface p-6">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">Info Analitik</h3>
+          <h3 className="text-sm font-bold text-slate-900 mb-4 font-display">Info Analitik</h3>
           <div className="space-y-3 text-sm">
             {[
-              { label: 'Rata-rata / hari', value: formatNumber(Math.round((data?.totalTaps ?? 0) / period)) },
+              { label: 'Rata-rata interaksi / hari', value: formatNumber(Math.round((data?.totalTaps ?? 0) / period)) },
               { label: 'Tap-to-click rate', value: data?.totalTaps ? `${Math.round(((data?.totalClicks ?? 0) / data.totalTaps) * 100)}%` : '0%' },
-              { label: 'Total Periode', value: `${period} hari` },
+              { label: 'Rentang Periode', value: `${period} hari` },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between">
                 <span className="text-slate-600">{label}</span>

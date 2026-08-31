@@ -80,15 +80,7 @@ export default async function CardPage({ params, searchParams }: Props) {
       })
 
       if (rpcErr) {
-        // Direct fallback logging
-        await supabaseAdmin.from('tap_logs').insert({
-          card_id: card.id,
-          access_method: accessMethod,
-          ip_address: ip,
-          user_agent: ua,
-          tapped_at: new Date().toISOString(),
-          ...(card.user_id ? { user_id: card.user_id } : {}),
-        })
+        // Direct counter increment fallback without tap_logs table insert
         const currentTaps = typeof card.total_taps === 'number' ? card.total_taps : 0
         await supabaseAdmin.from('cards').update({ total_taps: currentTaps + 1 }).eq('id', card.id)
       }

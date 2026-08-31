@@ -37,44 +37,7 @@ export async function GET(
 
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // 1. Fetch tap logs by card_id
-  let { data: logs, error: logsError } = await supabaseAdmin
-    .from('tap_logs')
-    .select('*')
-    .eq('card_id', card.id)
-    .order('tapped_at', { ascending: false })
-
-  if (logsError) {
-    console.error('GET /api/cards/[id] logs error:', logsError)
-  }
-
-  // 2. Retry by user_id if card_id query yielded no results
-  if ((!logs || logs.length === 0) && card.user_id) {
-    const retryUser = await supabaseAdmin
-      .from('tap_logs')
-      .select('*')
-      .eq('user_id', card.user_id)
-      .order('tapped_at', { ascending: false })
-
-    if (retryUser.data && retryUser.data.length > 0) {
-      logs = retryUser.data
-    }
-  }
-
-  // 3. Fallback: if still 0 logs, retrieve all recent tap logs
-  if (!logs || logs.length === 0) {
-    const fallbackAll = await supabaseAdmin
-      .from('tap_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (fallbackAll.data && fallbackAll.data.length > 0) {
-      logs = fallbackAll.data
-    }
-  }
-
-  return NextResponse.json({ card, logs: logs ?? [] })
+  return NextResponse.json({ card, logs: [] })
 }
 
 export async function PATCH(

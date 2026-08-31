@@ -856,7 +856,7 @@ export default function CardsPage() {
                         : 'bg-slate-100 text-slate-600 hover:text-slate-900'
                     )}
                   >
-                    <Activity size={14} /> Riwayat Tap ({logs.length})
+                    <Activity size={14} /> Statistik Tap ({selected.total_taps ?? 0})
                   </button>
                 </div>
 
@@ -1222,94 +1222,59 @@ export default function CardsPage() {
                   )}
                 </>
               ) : (
-                /* Today's Tap Activity Logs */
-                <div className="card-surface p-4 sm:p-6 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-2">
+                /* Tap Activity & Storage Efficiency Statistics */
+                <div className="card-surface p-6 sm:p-8 bg-white border border-slate-200/90 shadow-xs rounded-2xl min-w-0 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                     <div>
-                      <h2 className="text-sm sm:text-base font-bold text-slate-900 font-display">Riwayat Tap NFC & QR Scan Hari Ini</h2>
-                      <p className="text-slate-500 text-xs">Catatan interaksi publik khusus hari ini pada kartu ini.</p>
+                      <h2 className="text-base sm:text-lg font-bold text-slate-900 font-display flex items-center gap-2">
+                        <Zap size={20} className="text-amber-500 fill-amber-400" />
+                        Statistik Interaksi Media
+                      </h2>
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        Ringkasan total akumulasi tap NFC & scan QR pada kartu ini.
+                      </p>
                     </div>
 
-                    <button
-                      onClick={loadCardDetails}
-                      disabled={loadingLogs}
-                      className="flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto cursor-pointer"
-                    >
-                      <RefreshCw size={12} className={cn(loadingLogs && 'animate-spin')} /> Refresh Log
-                    </button>
+                    <div className="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto">
+                      <CheckCircle2 size={15} /> Terhitung Real-time
+                    </div>
                   </div>
 
-                  {logs.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-sm font-medium">
-                      Belum ada catatan interaksi tap atau scan khusus hari ini untuk kartu ini.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto min-w-0 w-full rounded-xl border border-slate-200/80">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-left bg-slate-50">
-                              <th className="px-4 py-2.5">Metode</th>
-                              <th className="px-4 py-2.5">Waktu</th>
-                              <th className="px-4 py-2.5">IP Address</th>
-                              <th className="px-4 py-2.5">User Agent</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/60">
-                            {logs.slice((logsPage - 1) * LOGS_PER_PAGE, logsPage * LOGS_PER_PAGE).map(log => (
-                              <tr key={log.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-3 font-semibold">
-                                  <span className={cn(
-                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px]',
-                                    log.access_method === 'nfc_tap'
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  )}>
-                                    {log.access_method === 'nfc_tap' ? <Wifi size={10} /> : <QrCode size={10} />}
-                                    {log.access_method === 'nfc_tap' ? 'NFC Tap' : 'QR Scan'}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">{formatDate(log.tapped_at)}</td>
-                                <td className="px-4 py-3 font-mono text-slate-500 whitespace-nowrap">{log.ip_address ?? '—'}</td>
-                                <td className="px-4 py-3 text-slate-500 max-w-[180px] sm:max-w-[240px] truncate">{log.user_agent ?? '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-100/80">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Tap & QR Scan</div>
+                      <div className="text-3xl font-extrabold text-slate-900 font-display">
+                        {(selected.total_taps ?? 0).toLocaleString('id-ID')} <span className="text-sm font-semibold text-slate-500">kali</span>
                       </div>
+                      <p className="text-[11px] text-slate-500 mt-2">Dihitung secara otomatis setiap kali kartu di-tap atau QR di-scan.</p>
+                    </div>
 
-                      {/* Pagination Controls */}
-                      {logs.length > LOGS_PER_PAGE && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200 text-xs">
-                          <div className="text-slate-500 font-medium text-center sm:text-left">
-                            Menampilkan {(logsPage - 1) * LOGS_PER_PAGE + 1}–{Math.min(logsPage * LOGS_PER_PAGE, logs.length)} dari {logs.length} log
-                          </div>
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Informasi Kartu</div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                        <span>Kode Aktivasi:</span>
+                        <span className="font-mono bg-white px-2 py-0.5 border rounded text-slate-700">{selected.activation_code}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                        <span>Status Kartu:</span>
+                        <span className={cn('text-[10px] px-2 py-0.5 rounded border uppercase', STATUS_COLORS[selected.status])}>{selected.status}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                        <span>Jumlah Link Aktif:</span>
+                        <span className="text-ony-blue font-extrabold">{safeLinks.length} link</span>
+                      </div>
+                    </div>
+                  </div>
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setLogsPage(p => Math.max(1, p - 1))}
-                              disabled={logsPage === 1}
-                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all cursor-pointer"
-                            >
-                              Sebelumnya
-                            </button>
-
-                            <span className="text-slate-700 font-bold px-2">
-                              {logsPage} / {Math.ceil(logs.length / LOGS_PER_PAGE)}
-                            </span>
-
-                            <button
-                              onClick={() => setLogsPage(p => Math.min(Math.ceil(logs.length / LOGS_PER_PAGE), p + 1))}
-                              disabled={logsPage >= Math.ceil(logs.length / LOGS_PER_PAGE)}
-                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 font-semibold transition-all cursor-pointer"
-                            >
-                              Berikutnya
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed flex items-start gap-3">
+                    <Sparkles size={18} className="text-ony-blue shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-slate-900">Performa & Kecepatan Pengalihan:</strong>
+                      <p className="mt-0.5 text-slate-500">
+                        Sistem Ony menghitung interaksi secara langsung dan aman untuk memastikan kecepatan pengalihan kartu NFC & QR milikmu tetap instan dan lancar kapan saja.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

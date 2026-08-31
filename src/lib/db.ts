@@ -136,32 +136,25 @@ export async function getUserById(id: string) {
 }
 
 // ─── Analytics Queries ───────────────────────────────────
-export async function logTap(cardId: string, method: AccessMethod, ip?: string, ua?: string) {
-  await supabaseAdmin.from('tap_logs').insert({
-    card_id: cardId,
-    access_method: method,
-    ip_address: ip,
-    user_agent: ua,
-    tapped_at: new Date().toISOString(),
+export async function logTap(cardId: string, _method?: AccessMethod, _ip?: string, _ua?: string) {
+  // Increment total_taps counter without inserting tap_logs rows (conserve free tier storage)
+  await supabaseAdmin.rpc('increment_taps', { card_id: cardId }).then(async ({ error }) => {
+    if (error) {
+      const { data: card } = await supabaseAdmin.from('cards').select('total_taps').eq('id', cardId).maybeSingle()
+      const current = typeof card?.total_taps === 'number' ? card.total_taps : 0
+      await supabaseAdmin.from('cards').update({ total_taps: current + 1 }).eq('id', cardId)
+    }
   })
-  await supabaseAdmin
-    .from('cards')
-    .update({ total_taps: supabaseAdmin.rpc as unknown as number })
-    .eq('id', cardId)
-  // increment total_taps via rpc
-  await supabaseAdmin.rpc('increment_taps', { card_id: cardId })
 }
 
 export async function getUserAnalytics(userId: string, days = 30) {
-  const since = new Date(Date.now() - days * 86400000).toISOString()
-  const cardIds = (await getUserCards(userId)).map(c => c.id)
-  if (!cardIds.length) return { taps: [], clicks: [], total: 0, totalClicks: 0 }
+  const cards = await getUserCards(userId)
+  if (!cards.length) return { taps: [], clicks: [], total: 0, totalClicks: 0 }
 
-  const { data: taps } = await supabaseAdmin
-    .from('tap_logs')
-    .select('tapped_at, access_method')
-    .in('card_id', cardIds)
-    .gte('tapped_at', since)
+  const totalTaps = cards.reduce((sum, c) => sum + (c.total_taps || 0), 0)
+
+  const since = new Date(Date.now() - days * 86400000).toISOString()
+  const cardIds = cards.map(c => c.id)
 
   const { data: clicks } = await supabaseAdmin
     .from('link_click_logs')
@@ -170,9 +163,9 @@ export async function getUserAnalytics(userId: string, days = 30) {
     .gte('clicked_at', since)
 
   return {
-    taps: taps ?? [],
+    taps: [],
     clicks: clicks ?? [],
-    total: (taps ?? []).length,
+    total: totalTaps,
     totalClicks: (clicks ?? []).length,
   }
 }

@@ -36,18 +36,18 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [])
 
+  const safeCards = Array.isArray(cards) ? cards : []
+  const totalInteractions = analytics?.totalTaps ?? safeCards.reduce((acc, c) => acc + (c.total_taps || 0), 0)
+
   const stats = [
-    { label: 'Total Interaksi', value: analytics?.totalTaps ?? 0, icon: Wifi, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-100' },
+    { label: 'Total Interaksi', value: totalInteractions, icon: Wifi, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-100' },
     { label: 'Total Klik Link', value: analytics?.totalClicks ?? 0, icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50 border border-indigo-100' },
-    { label: 'NFC Tap', value: analytics?.nfcTaps ?? 0, icon: Wifi, color: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100' },
-    { label: 'QR Scan', value: analytics?.qrScans ?? 0, icon: QrCode, color: 'text-purple-600', bg: 'bg-purple-50 border border-purple-100' },
+    { label: 'Total Media', value: safeCards.length, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100' },
   ]
 
   const MEDIA_ICONS: Record<string, string> = {
     nfc_card: '💳', nfc_sticker: '🏷️', qr_standee: '🖼️', qr_keychain: '🔑', digital_qr: '📱',
   }
-
-  const safeCards = Array.isArray(cards) ? cards : []
 
   return (
     <div className="max-w-5xl w-full mx-auto space-y-6 sm:space-y-8 min-w-0">
@@ -60,9 +60,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 min-w-0">
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="card-surface p-3.5 sm:p-5 min-w-0">
+          <div key={label} className="card-surface p-4 sm:p-5 min-w-0">
             <div className={`w-9 h-9 sm:w-10 sm:h-10 ${bg} rounded-2xl flex items-center justify-center mb-2.5 shadow-xs`}>
               <Icon size={18} className={color} />
             </div>
