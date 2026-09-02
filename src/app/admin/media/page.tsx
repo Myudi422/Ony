@@ -636,18 +636,48 @@ export default function AdminMediaPage() {
             {/* Bulk Actions for Batch Generation */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
+                onClick={() => handleDownloadBatchPdf(newCards)}
+                disabled={!!pdfProgress}
+                className="text-xs text-blue-950 bg-gradient-to-r from-blue-300 via-sky-400 to-blue-500 hover:from-blue-400 hover:to-blue-600 px-3.5 py-1.5 rounded-xl transition-all shadow-md font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Download PDF cetak 2 sisi (duplex: Depan + Belakang)"
+              >
+                {pdfProgress ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                <span>{pdfProgress ? `Generate PDF (${pdfProgress.completed}/${pdfProgress.total})...` : `Download PDF Duplex (${newCards.length})`}</span>
+              </button>
+
+              <button
+                onClick={() => handleDownloadBatchZip(newCards)}
+                disabled={!!zipProgress}
+                className="text-xs text-amber-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 px-3.5 py-1.5 rounded-xl transition-all shadow-md font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Download semua mockup cetak (Depan + Belakang + PDF) dalam file ZIP"
+              >
+                {zipProgress ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                <span>{zipProgress ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...` : `Download Package ZIP (${newCards.length})`}</span>
+              </button>
+
+              <button
                 onClick={() => bulkCopyLinks(newCards)}
                 className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 font-semibold shadow-xs"
               >
                 <Copy size={13} /> Salin Semua Link ({newCards.length})
               </button>
+
               <button
                 onClick={() => bulkCopyCodes(newCards)}
                 className="btn-ghost bg-white hover:bg-slate-50 text-slate-800 text-xs py-1.5 px-3 border border-slate-200 flex items-center gap-1.5 font-semibold"
               >
                 <Tag size={13} /> Salin Kode ({newCards.length})
               </button>
-              <button onClick={() => setNewCards([])} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-blue-100/50 transition-colors ml-1">
+
+              <button
+                onClick={() => bulkCopyCSV(newCards)}
+                className="btn-ghost bg-white hover:bg-slate-50 text-slate-800 text-xs py-1.5 px-3 border border-slate-200 flex items-center gap-1.5 font-semibold"
+                title="Salin data CSV batch baru"
+              >
+                <FileText size={13} /> Salin CSV
+              </button>
+
+              <button onClick={() => setNewCards([])} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-blue-100/50 transition-colors ml-1" title="Tutup hasil generate">
                 <X size={18} />
               </button>
             </div>
