@@ -176,6 +176,76 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // ── Prefix activation_code with card_number ─────────────────────────────
+  // Format: ${card_number}${5-char random suffix} e.g. "123ABCDE"
+  // Non-fatal: if this step fails, cards still exist with their temp random codes.
+  // ONLY newly inserted cards are touched — existing cards are never modified.
+  if (data && data.length > 0) {
+    try {
+      const justInsertedIds = new Set(data.map((c) => c.id))
+
+      // Build prefixed codes; avoid duplicates within this batch
+      const batchUsed = new Set<string>()
+      const codeUpdates: { id: string; activation_code: string }[] = []
+
+      for (const card of data) {
+        const prefix = card.card_number ?? ''
+        let code: string
+        let attempts = 0
+        do {
+          code = `${prefix}${generateActivationCode(5)}`
+          attempts++
+        } while (batchUsed.has(code) && attempts < 20)
+        batchUsed.add(code)
+        codeUpdates.push({ id: card.id, activation_code: code })
+      }
+
+      // Check proposed codes against DB (exclude the cards we just inserted)
+      const proposed = codeUpdates.map((u) => u.activation_code)
+      const { data: conflicts } = await supabaseAdmin
+        .from('cards')
+        .select('activation_code, id')
+        .in('activation_code', proposed)
+
+      const dbConflicts = new Set(
+        (conflicts ?? [])
+          .filter((c) => !justInsertedIds.has(c.id)) // only real conflicts (not our own cards)
+          .map((c) => c.activation_code)
+      )
+
+      // Regenerate suffix for any DB conflict
+      for (const update of codeUpdates) {
+        let attempts = 0
+        while (dbConflicts.has(update.activation_code) && attempts < 10) {
+          const card = data.find((c) => c.id === update.id)
+          update.activation_code = `${card?.card_number ?? ''}${generateActivationCode(5)}`
+          attempts++
+        }
+      }
+
+      // Batch UPDATE — only newly inserted cards
+      await Promise.all(
+        codeUpdates.map(({ id, activation_code }) =>
+          supabaseAdmin
+            .from('cards')
+            .update({ activation_code, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .eq('status', 'unclaimed') // safety guard: never touch claimed/active cards
+        )
+      )
+
+      // Re-fetch with updated codes so response reflects final codes
+      const { data: refreshed } = await supabaseAdmin
+        .from('cards')
+        .select()
+        .in('id', data.map((c) => c.id))
+      if (refreshed) data = refreshed
+    } catch (prefixErr) {
+      // Non-fatal — cards were created, prefix update failed
+      console.warn('[card-prefix] Non-fatal prefix update error:', prefixErr)
+    }
+  }
+
   // Log audit
   try {
     await supabaseAdmin.from('admin_audit_logs').insert({
