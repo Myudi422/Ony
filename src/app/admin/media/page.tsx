@@ -1073,8 +1073,26 @@ export default function AdminMediaPage() {
                     </td>
 
                     {/* Code */}
-                    <td className="px-4 py-3.5 font-mono text-ony-blue text-xs font-bold">
-                      {card.activation_code}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-1.5 font-mono text-ony-blue text-xs font-bold">
+                        <span>{card.activation_code}</span>
+                        <button
+                          onClick={() => copyToClipboard(nfcUrl, card.activation_code)}
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                          title="Salin Link NFC"
+                        >
+                          {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                        </button>
+                        <a
+                          href={nfcUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 text-slate-400 hover:text-ony-blue hover:bg-slate-100 rounded-md transition-colors"
+                          title="Buka Link di Tab Baru"
+                        >
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
                     </td>
 
                     {/* Opsi Payment */}
@@ -1127,6 +1145,15 @@ export default function AdminMediaPage() {
                     {/* Actions */}
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <a
+                          href={nfcUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-2 py-1 rounded-lg transition-all font-semibold"
+                          title="Buka link kartu di tab baru"
+                        >
+                          <ExternalLink size={11} /> Cek
+                        </a>
                         <button
                           onClick={() => handleOpenMockupModal(card)}
                           className="flex items-center gap-1 text-[11px] text-amber-900 bg-amber-50 border border-amber-300 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-all font-bold cursor-pointer"
@@ -1405,21 +1432,44 @@ export default function AdminMediaPage() {
 
               {/* Target URL */}
               <div className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-left">
-                <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1 font-display">Target NFC URL</div>
+                <div className="flex items-center justify-between mb-1 font-display">
+                  <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Target NFC URL</div>
+                  <a
+                    href={`${baseUrl}/c/${previewCard.activation_code}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-ony-blue hover:underline text-[11px] font-semibold flex items-center gap-1"
+                    title="Buka link di tab baru"
+                  >
+                    Buka Tab Baru <ExternalLink size={11} />
+                  </a>
+                </div>
                 <div className="text-ony-blue font-mono text-xs break-all">
                   {`${baseUrl}/c/${previewCard.activation_code}`}
                 </div>
               </div>
 
-              {/* Action Buttons: Copy Link & Downloads */}
+              {/* Action Buttons: Copy Link & New Tab & Downloads */}
               <div className="space-y-2 w-full">
-                <button
-                  onClick={() => copyToClipboard(`${baseUrl}/c/${previewCard.activation_code}`, previewCard.activation_code)}
-                  className="w-full btn-primary py-2.5 text-xs flex items-center justify-center gap-2 font-semibold shadow-xs"
-                >
-                  {copiedCode === previewCard.activation_code ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedCode === previewCard.activation_code ? 'Link Tersalin!' : 'Salin NFC Link'}
-                </button>
+                <div className="flex gap-2 w-full">
+                  <button
+                    onClick={() => copyToClipboard(`${baseUrl}/c/${previewCard.activation_code}`, previewCard.activation_code)}
+                    className="flex-1 btn-primary py-2.5 text-xs flex items-center justify-center gap-2 font-semibold shadow-xs"
+                  >
+                    {copiedCode === previewCard.activation_code ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedCode === previewCard.activation_code ? 'Link Tersalin!' : 'Salin NFC Link'}
+                  </button>
+                  <a
+                    href={`${baseUrl}/c/${previewCard.activation_code}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-ghost text-xs py-2.5 px-3.5 flex items-center justify-center gap-1.5 border border-slate-200 font-semibold text-slate-800 hover:bg-slate-50 transition-colors shrink-0"
+                    title="Buka link di tab baru"
+                  >
+                    <ExternalLink size={14} />
+                    <span>Cek Link</span>
+                  </a>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2 w-full">
                   <button
