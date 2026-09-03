@@ -271,8 +271,8 @@ export default function AdminUsersPage() {
 
       {/* POPUP MODAL: LIST KARTU USER */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl w-full p-0 sm:max-w-2xl overflow-hidden bg-white rounded-2xl shadow-2xl border border-slate-200">
-          <DialogHeader className="p-5 border-b border-slate-100 bg-slate-50/70">
+        <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white rounded-2xl shadow-2xl border border-slate-200">
+          <DialogHeader className="p-4 sm:p-5 pr-12 border-b border-slate-100 bg-slate-50/70 shrink-0">
             <div className="flex items-center gap-3">
               {selectedUser?.avatar_url ? (
                 <Image src={selectedUser.avatar_url} alt={selectedUser.name} width={40} height={40} className="rounded-full ring-2 ring-blue-100 shrink-0" />
@@ -281,21 +281,21 @@ export default function AdminUsersPage() {
                   {selectedUser?.name?.[0] ?? '?'}
                 </div>
               )}
-              <div>
-                <DialogTitle className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                  <span>Kartu Milik {selectedUser?.name}</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-ony-blue font-mono font-bold">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-sm sm:text-base font-bold text-slate-900 font-display flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="truncate max-w-[180px] sm:max-w-none">Kartu Milik {selectedUser?.name}</span>
+                  <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-100 text-ony-blue font-mono font-bold shrink-0">
                     {cardsTotal} Total Kartu
                   </span>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
+                <DialogDescription className="text-xs text-slate-500 truncate">
                   {selectedUser?.email}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="p-5 space-y-4">
+          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
             {/* Search filter in modal */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -307,10 +307,83 @@ export default function AdminUsersPage() {
               />
             </div>
 
-            {/* Cards Table Container */}
-            <div className="border border-slate-200/80 rounded-xl overflow-hidden shadow-2xs">
+            {/* Mobile Cards Container (stacked list for < sm) */}
+            <div className="sm:hidden space-y-3">
+              {cardsLoading ? (
+                <div className="text-center py-8 text-slate-500 flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-ony-blue" />
+                  <span className="text-xs">Memuat daftar kartu...</span>
+                </div>
+              ) : userCards.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs font-medium border border-slate-200/80 rounded-xl p-4 bg-slate-50/50">
+                  {cardsSearch ? 'Tidak ada kartu yang cocok dengan pencarian.' : 'User ini belum memiliki kartu terhubung.'}
+                </div>
+              ) : (
+                userCards.map(card => {
+                  const isUnpaid = card.payment_status === 'unpaid' || card.redirect_url === 'UNPAID'
+                  const cardUrl = `${baseUrl}/c/${card.activation_code}`
+                  const isCopied = copiedCode === card.activation_code
+
+                  return (
+                    <div key={card.id} className="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-2xs space-y-2.5">
+                      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
+                        <div>
+                          <div className="text-xs font-mono font-bold text-slate-900">#{card.card_number ?? '-'}</div>
+                          <div className="text-xs font-mono font-extrabold text-ony-blue">{card.activation_code}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          <span className={cn('px-2 py-0.5 text-[10px] rounded-full font-bold border capitalize', STATUS_COLORS[card.status] || 'bg-slate-100 text-slate-700')}>
+                            {card.status}
+                          </span>
+                          <span className={cn('px-2 py-0.5 text-[10px] rounded-full font-bold border uppercase tracking-wider', isUnpaid ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200')}>
+                            {isUnpaid ? 'BLANK' : 'BAYAR'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-slate-800 truncate">{card.card_name || 'NFC Smart Media'}</div>
+                          <div className="text-[10px] text-slate-400 uppercase tracking-tight">{card.media_type || 'NFC + QR'}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-[10px] text-slate-400">Total Tap</div>
+                          <div className="font-mono font-bold text-slate-700 text-xs">{card.total_taps ?? 0}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(cardUrl)
+                            setCopiedCode(card.activation_code)
+                            setTimeout(() => setCopiedCode(null), 2000)
+                          }}
+                          className="flex-1 py-1.5 px-2 text-xs font-semibold text-slate-700 hover:text-slate-900 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          {isCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                          <span>{isCopied ? 'Tersalin' : 'Salin URL'}</span>
+                        </button>
+                        <a
+                          href={cardUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="py-1.5 px-3 text-xs font-semibold text-ony-blue border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center justify-center gap-1"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Buka</span>
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Cards Table Container (Desktop view >= sm) */}
+            <div className="hidden sm:block border border-slate-200/80 rounded-xl overflow-hidden shadow-2xs">
               <div className="overflow-x-auto max-h-[320px]">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-left min-w-[540px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0 uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="px-4 py-2.5">No / Kode</th>
@@ -400,8 +473,8 @@ export default function AdminUsersPage() {
             </div>
 
             {/* Modal Pagination Footer */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <span className="text-slate-500 text-xs font-medium">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-slate-100 shrink-0">
+              <span className="text-slate-500 text-xs font-medium text-center sm:text-left">
                 Halaman {cardsPage} dari {Math.ceil(cardsTotal / 5) || 1} ({cardsTotal} total kartu)
               </span>
               <div className="flex items-center gap-2">
