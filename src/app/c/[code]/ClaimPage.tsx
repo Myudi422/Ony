@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   Wifi, ArrowRight, CreditCard, Tag, Tv, Key, ShieldCheck, Zap,
   Link2, ShoppingCart, CheckCircle2, BarChart2, QrCode, RefreshCw, Sparkles,
-  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle, PlayCircle, X, Maximize2, HelpCircle
+  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle, PlayCircle, X, Maximize2, HelpCircle, Search, ExternalLink
 } from 'lucide-react'
 
 const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = {
@@ -64,6 +64,8 @@ export default function ClaimPage({
   // Tutorial Video Modal State & Ref
   const [showTutorialModal, setShowTutorialModal] = useState(false)
   const [showMapsHelpModal, setShowMapsHelpModal] = useState(false)
+  const [mapsModalTab, setMapsModalTab] = useState<'search' | 'tutorial'>('search')
+  const [mapsSearchQuery, setMapsSearchQuery] = useState('')
   const tutorialVideoRef = useRef<HTMLVideoElement>(null)
 
   // Fullscreen / Landscape trigger for mobile devices
@@ -1582,16 +1584,17 @@ export default function ClaimPage({
         </div>
       )}
 
-      {/* POPUP MODAL TUTORIAL MAPS */}
+      {/* POPUP MODAL HELPER GOOGLE MAPS */}
       {showMapsHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="relative w-full max-w-sm bg-white rounded-2xl p-5 border border-slate-200 shadow-2xl space-y-4 text-left">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm font-display">
                 <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
                   <MapPin size={18} />
                 </div>
-                <span>Cara Ambil Link Maps</span>
+                <span>Bantuan Google Maps</span>
               </div>
               <button
                 type="button"
@@ -1602,21 +1605,93 @@ export default function ClaimPage({
               </button>
             </div>
 
-            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-700 font-medium leading-relaxed">
-              <li>Buka aplikasi atau website <strong className="text-slate-900">Google Maps</strong>.</li>
-              <li>Cari dan pilih <strong className="text-slate-900">lokasi / bisnis</strong> kamu.</li>
-              <li>Klik tombol <strong className="text-slate-900">Bagikan (Share)</strong>.</li>
-              <li>Pilih <strong className="text-slate-900">Salin Link</strong> (format link wajib: <code className="bg-amber-50 text-amber-900 font-mono px-1 py-0.5 rounded text-[10px] border border-amber-200 font-bold">https://maps.app.goo.gl/...</code>).</li>
-              <li>Tempel / Paste link tersebut ke kolom di atas.</li>
-            </ol>
+            {/* Tab Switcher */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold font-display">
+              <button
+                type="button"
+                onClick={() => setMapsModalTab('search')}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mapsModalTab === 'search'
+                    ? 'bg-white text-amber-700 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Search size={14} />
+                <span>Cari Bisnis</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapsModalTab('tutorial')}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mapsModalTab === 'tutorial'
+                    ? 'bg-white text-amber-700 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <HelpCircle size={14} />
+                <span>Panduan Link</span>
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowMapsHelpModal(false)}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold font-display transition-all cursor-pointer shadow-xs"
-            >
-              Saya Mengerti
-            </button>
+            {/* Tab 1: Cari Bisnis (Free 0 API Limit Search Redirect) */}
+            {mapsModalTab === 'search' && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 leading-relaxed font-sans">
+                  Ketik nama toko / bisnis kamu untuk membuka pencarian di aplikasi Google Maps:
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={mapsSearchQuery}
+                    onChange={(e) => setMapsSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && mapsSearchQuery.trim()) {
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsSearchQuery.trim())}`, '_blank')
+                      }
+                    }}
+                    placeholder="Contoh: Kopi Kenangan Dago Bandung"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs text-slate-900 outline-none font-sans"
+                  />
+                  <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!mapsSearchQuery.trim()) return
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsSearchQuery.trim())}`, '_blank')
+                  }}
+                  disabled={!mapsSearchQuery.trim()}
+                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold font-display transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <ExternalLink size={14} />
+                  <span>Buka & Cari di Google Maps</span>
+                </button>
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/70 text-[11px] text-amber-900 leading-relaxed">
+                  💡 <strong>Setelah Maps terbuka:</strong> Klik tombol <strong>Bagikan (Share)</strong> ➔ <strong>Salin Link</strong>, lalu tempel link tersebut ke form Ony.
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Panduan Salin Link */}
+            {mapsModalTab === 'tutorial' && (
+              <div className="space-y-3">
+                <ol className="list-decimal list-inside space-y-2 text-xs text-slate-700 font-medium leading-relaxed">
+                  <li>Buka aplikasi atau website <strong className="text-slate-900">Google Maps</strong>.</li>
+                  <li>Cari dan pilih <strong className="text-slate-900">lokasi / bisnis</strong> kamu.</li>
+                  <li>Klik tombol <strong className="text-slate-900">Bagikan (Share)</strong>.</li>
+                  <li>Pilih <strong className="text-slate-900">Salin Link</strong> (format link wajib: <code className="bg-amber-50 text-amber-900 font-mono px-1 py-0.5 rounded text-[10px] border border-amber-200 font-bold">https://maps.app.goo.gl/...</code>).</li>
+                  <li>Tempel / Paste link tersebut ke kolom di atas.</li>
+                </ol>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMapsHelpModal(false)}
+                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold font-display transition-all cursor-pointer shadow-xs"
+                >
+                  Saya Mengerti
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
