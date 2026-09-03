@@ -12,11 +12,11 @@ import {
 } from 'lucide-react'
 
 const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = {
-  nfc_card:    { icon: CreditCard, name: 'NFC Card' },
-  nfc_sticker: { icon: Tag,        name: 'NFC Sticker' },
-  qr_standee:  { icon: Tv,         name: 'QR Standee' },
-  qr_keychain: { icon: Key,        name: 'NFC Keychain' },
-  digital_qr:  { icon: CreditCard, name: 'Digital Card' },
+  nfc_card: { icon: CreditCard, name: 'NFC Card' },
+  nfc_sticker: { icon: Tag, name: 'NFC Sticker' },
+  qr_standee: { icon: Tv, name: 'QR Standee' },
+  qr_keychain: { icon: Key, name: 'NFC Keychain' },
+  digital_qr: { icon: CreditCard, name: 'Digital Card' },
 }
 
 function isValidGoogleMapsUrl(url: string): boolean {
@@ -78,13 +78,13 @@ export default function ClaimPage({
       } else if ((v as any).webkitRequestFullscreen) {
         await (v as any).webkitRequestFullscreen()
       } else if ((v as any).webkitEnterFullscreen) {
-        ;(v as any).webkitEnterFullscreen()
+        ; (v as any).webkitEnterFullscreen()
       }
 
       if (screen.orientation && 'lock' in screen.orientation) {
-        await (screen.orientation as any).lock('landscape').catch(() => {})
+        await (screen.orientation as any).lock('landscape').catch(() => { })
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Tab State: 'owner' (Google Login) | 'seller' (Email activation by Seller)
@@ -138,7 +138,7 @@ export default function ClaimPage({
 
     const activePurpose = storedPurpose || cardPurpose
     let targetUrl = activePurpose === 'google_review' ? (googleMapsUrl || storedReviewUrl || '') :
-                    activePurpose === 'custom_redirect' ? (customRedirectUrl || storedRedirectUrl || '') : ''
+      activePurpose === 'custom_redirect' ? (customRedirectUrl || storedRedirectUrl || '') : ''
 
     // Strict URL validation if purpose is NOT business_card (profile)
     if (activePurpose === 'google_review') {
@@ -171,7 +171,7 @@ export default function ClaimPage({
         if (genData.success && genData.reviewUrl) {
           targetUrl = genData.reviewUrl
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     try {
@@ -270,7 +270,7 @@ export default function ClaimPage({
     }
 
     let targetUrl = payPurpose === 'google_review' ? payGoogleMapsUrl.trim() :
-                    payPurpose === 'custom_redirect' ? payCustomRedirectUrl.trim() : ''
+      payPurpose === 'custom_redirect' ? payCustomRedirectUrl.trim() : ''
 
     if (payPurpose === 'google_review') {
       if (!targetUrl) {
@@ -303,7 +303,7 @@ export default function ClaimPage({
         if (genData.success && genData.reviewUrl) {
           targetUrl = genData.reviewUrl
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     try {
@@ -481,14 +481,14 @@ export default function ClaimPage({
           if (genData.success && genData.reviewUrl) {
             finalReviewUrl = genData.reviewUrl
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Determine the URL to pass for each purpose
       const redirectUrlToSend =
         cardPurpose === 'google_review' ? finalReviewUrl :
-        cardPurpose === 'custom_redirect' ? customRedirectUrl :
-        ''
+          cardPurpose === 'custom_redirect' ? customRedirectUrl :
+            ''
 
       const res = await fetch('/api/cards/seller-claim', {
         method: 'POST',
@@ -511,8 +511,8 @@ export default function ClaimPage({
 
       const purposeLabel =
         cardPurpose === 'google_review' ? 'Google Maps Review' :
-        cardPurpose === 'custom_redirect' ? 'Direct URL Redirect' :
-        'Business Card'
+          cardPurpose === 'custom_redirect' ? 'Direct URL Redirect' :
+            'Business Card'
 
       setSellerSuccess({
         email: sellerEmail,
@@ -652,7 +652,7 @@ export default function ClaimPage({
               <div className="pt-4 border-t border-slate-200/80">
                 <div className="p-5 rounded-2xl bg-slate-900 text-white text-left relative overflow-hidden shadow-xl mb-4">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-ony-gradient opacity-10 rounded-full blur-2xl pointer-events-none" />
-                  
+
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Biaya Aktivasi Media</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
@@ -718,9 +718,8 @@ export default function ClaimPage({
                             setPayPurpose(value)
                             setPayFormError(null)
                           }}
-                          className={`flex flex-col items-center text-center gap-1 p-2.5 rounded-xl border-2 transition-all font-display cursor-pointer ${
-                            payPurpose === value ? color : inactive
-                          }`}
+                          className={`flex flex-col items-center text-center gap-1 p-2.5 rounded-xl border-2 transition-all font-display cursor-pointer ${payPurpose === value ? color : inactive
+                            }`}
                         >
                           <Icon size={16} />
                           <span className="font-extrabold text-[11px]">{label}</span>
@@ -735,7 +734,7 @@ export default function ClaimPage({
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
-                          Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                          Link Maps<span className="text-rose-500">*</span>
                         </label>
                         <button
                           type="button"
@@ -779,7 +778,7 @@ export default function ClaimPage({
                                 setPayGoogleMapsUrl(data.reviewUrl)
                                 setPayReviewLinkSuccessNote('Link ulasan Google Maps berhasil dibuat!')
                               }
-                            } catch (_) {}
+                            } catch (_) { }
                             setPayGeneratingReviewLink(false)
                           }}
                           disabled={payGeneratingReviewLink || !payGoogleMapsUrl}
@@ -878,11 +877,10 @@ export default function ClaimPage({
                     setActiveTab('owner')
                     setSellerError(null)
                   }}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all duration-200 font-display ${
-                    activeTab === 'owner'
-                      ? 'bg-white text-ony-blue shadow-md shadow-slate-200/80 border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                  }`}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all duration-200 font-display ${activeTab === 'owner'
+                    ? 'bg-white text-ony-blue shadow-md shadow-slate-200/80 border border-slate-200/80'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    }`}
                 >
                   <UserCheck size={16} />
                   <span>Manage Sendiri</span>
@@ -894,11 +892,10 @@ export default function ClaimPage({
                     setActiveTab('seller')
                     setSellerError(null)
                   }}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all duration-200 font-display ${
-                    activeTab === 'seller'
-                      ? 'bg-white text-ony-blue shadow-md shadow-slate-200/80 border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                  }`}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all duration-200 font-display ${activeTab === 'seller'
+                    ? 'bg-white text-ony-blue shadow-md shadow-slate-200/80 border border-slate-200/80'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    }`}
                 >
                   <Store size={16} />
                   <span>Transfer ke Client</span>
@@ -961,9 +958,8 @@ export default function ClaimPage({
                               key={value}
                               type="button"
                               onClick={() => setCardPurpose(value)}
-                              className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border-2 transition-all font-display cursor-pointer ${
-                                cardPurpose === value ? color : inactive
-                              }`}
+                              className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border-2 transition-all font-display cursor-pointer ${cardPurpose === value ? color : inactive
+                                }`}
                             >
                               <Icon size={18} />
                               <span className="font-extrabold text-[11px]">{label}</span>
@@ -978,7 +974,7 @@ export default function ClaimPage({
                         <div className="animate-in fade-in duration-150 space-y-2">
                           <div className="flex items-center justify-between mb-1">
                             <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
-                              Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                              Link Maps <span className="text-rose-500">*</span>
                             </label>
                             <button
                               type="button"
@@ -1127,9 +1123,8 @@ export default function ClaimPage({
                               key={value}
                               type="button"
                               onClick={() => setCardPurpose(value)}
-                              className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border-2 transition-all font-display ${
-                                cardPurpose === value ? color : inactive
-                              }`}
+                              className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border-2 transition-all font-display ${cardPurpose === value ? color : inactive
+                                }`}
                             >
                               <Icon size={18} />
                               <span className="font-extrabold text-[11px]">{label}</span>
@@ -1340,166 +1335,166 @@ export default function ClaimPage({
                     /* FORM FOR SELLER ACTIVATION */
                     <div>
                       <form onSubmit={handleSellerSubmit} className="space-y-4 text-left">
-                      <p className="text-slate-600 text-xs leading-relaxed">
-                        Form khusus untuk mengaktifkan kartu dan langsung mentransfer kepemilikan atas nama email klien.
-                      </p>
+                        <p className="text-slate-600 text-xs leading-relaxed">
+                          Form khusus untuk mengaktifkan kartu dan langsung mentransfer kepemilikan atas nama email klien.
+                        </p>
 
-                      {sellerError && (
-                        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
-                          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                          <span>{sellerError}</span>
-                        </div>
-                      )}
-
-                      {/* Email Input */}
-                      <div>
-                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
-                          Email Klien / Penerima Kartu <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                            <Mail size={16} />
+                        {sellerError && (
+                          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
+                            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                            <span>{sellerError}</span>
                           </div>
-                          <input
-                            type="email"
-                            required
-                            placeholder="nama@email.com"
-                            value={sellerEmail}
-                            onChange={(e) => setSellerEmail(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
-                          />
-                        </div>
-                      </div>
+                        )}
 
-                      {/* Dropdown Select Mode / Purpose */}
-                      <div>
-                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
-                          Tipe / Tujuan Kartu <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={cardPurpose}
-                            onChange={(e) => setCardPurpose(e.target.value as 'google_review' | 'business_card' | 'custom_redirect')}
-                            className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs font-bold text-slate-800 outline-none transition-all appearance-none cursor-pointer font-display"
-                          >
-                            <option value="google_review">⭐ Google Maps Review (Direct Redirect)</option>
-                            <option value="business_card">💳 Business Card (Profil Digital & Bio Link)</option>
-                            <option value="custom_redirect">🔗 Custom URL Redirect (Bebas Arahkan ke URL Apapun)</option>
-                          </select>
-                          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                            <Sparkles size={16} />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Conditional: Google Maps Review */}
-                      {cardPurpose === 'google_review' && (
-                        <div className="animate-in fade-in duration-150 space-y-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
-                              Link / Share Google Maps <span className="text-rose-500">*</span>
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => setShowMapsHelpModal(true)}
-                              className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
-                            >
-                              <HelpCircle size={13} />
-                              <span>Cara Ambil Link?</span>
-                            </button>
-                          </div>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                              <MapPin size={16} />
-                            </div>
-                            <input
-                              type="url"
-                              placeholder="https://maps.app.goo.gl/..."
-                              value={googleMapsUrl}
-                              onChange={(e) => {
-                                setGoogleMapsUrl(e.target.value)
-                                setReviewLinkSuccessNote(null)
-                              }}
-                              className="w-full pl-10 pr-24 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleGenerateReviewLink()}
-                              disabled={generatingReviewLink || !googleMapsUrl}
-                              className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-ony-gradient text-white rounded-lg font-bold text-[11px] hover:opacity-95 disabled:opacity-50 transition-all flex items-center gap-1 font-display shadow-xs"
-                            >
-                              {generatingReviewLink ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                              <span>Generate</span>
-                            </button>
-                          </div>
-                          {reviewLinkSuccessNote ? (
-                            <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                              <CheckCircle2 size={13} />
-                              {reviewLinkSuccessNote}
-                            </p>
-                          ) : (
-                            <p className="text-[10px] text-slate-500 leading-normal">
-                              Format link wajib: <span className="font-mono text-blue-600 font-semibold">https://maps.app.goo.gl/...</span>, lalu klik <strong>Generate</strong> untuk mengubahnya jadi link ulasan langsung.
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Conditional: Custom URL Redirect */}
-                      {cardPurpose === 'custom_redirect' && (
-                        <div className="animate-in fade-in duration-150 space-y-2">
-                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
-                            URL Tujuan Redirect
+                        {/* Email Input */}
+                        <div>
+                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                            Email Klien / Penerima Kartu <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                              <Link2 size={16} />
+                              <Mail size={16} />
                             </div>
                             <input
-                              type="url"
-                              placeholder="https://wa.me/628... atau URL apapun"
-                              value={customRedirectUrl}
-                              onChange={(e) => setCustomRedirectUrl(e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
+                              type="email"
+                              required
+                              placeholder="nama@email.com"
+                              value={sellerEmail}
+                              onChange={(e) => setSellerEmail(e.target.value)}
+                              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
                             />
                           </div>
-                          <p className="text-[10px] text-slate-500 leading-normal">
-                            Tap/scan kartu akan langsung redirect ke URL ini — WhatsApp, website, Instagram, Tokopedia, Shopee, dll.
-                          </p>
                         </div>
-                      )}
 
-                      {/* Submit Button */}
-                      <button
-                        type="submit"
-                        disabled={submittingSeller}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-ony-gradient text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display mt-2"
-                      >
-                        {submittingSeller ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>Mengaktifkan Kartu...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap size={16} />
-                            <span>Submit & Aktifkan Kartu</span>
-                            <ArrowRight size={16} className="ml-auto" />
-                          </>
+                        {/* Dropdown Select Mode / Purpose */}
+                        <div>
+                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
+                            Tipe / Tujuan Kartu <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={cardPurpose}
+                              onChange={(e) => setCardPurpose(e.target.value as 'google_review' | 'business_card' | 'custom_redirect')}
+                              className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs font-bold text-slate-800 outline-none transition-all appearance-none cursor-pointer font-display"
+                            >
+                              <option value="google_review">⭐ Google Maps Review (Direct Redirect)</option>
+                              <option value="business_card">💳 Business Card (Profil Digital & Bio Link)</option>
+                              <option value="custom_redirect">🔗 Custom URL Redirect (Bebas Arahkan ke URL Apapun)</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                              <Sparkles size={16} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Conditional: Google Maps Review */}
+                        {cardPurpose === 'google_review' && (
+                          <div className="animate-in fade-in duration-150 space-y-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
+                                Link / Share Google Maps <span className="text-rose-500">*</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setShowMapsHelpModal(true)}
+                                className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
+                              >
+                                <HelpCircle size={13} />
+                                <span>Cara Ambil Link?</span>
+                              </button>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <MapPin size={16} />
+                              </div>
+                              <input
+                                type="url"
+                                placeholder="https://maps.app.goo.gl/..."
+                                value={googleMapsUrl}
+                                onChange={(e) => {
+                                  setGoogleMapsUrl(e.target.value)
+                                  setReviewLinkSuccessNote(null)
+                                }}
+                                className="w-full pl-10 pr-24 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-ony-blue focus:ring-2 focus:ring-blue-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleGenerateReviewLink()}
+                                disabled={generatingReviewLink || !googleMapsUrl}
+                                className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-ony-gradient text-white rounded-lg font-bold text-[11px] hover:opacity-95 disabled:opacity-50 transition-all flex items-center gap-1 font-display shadow-xs"
+                              >
+                                {generatingReviewLink ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                <span>Generate</span>
+                              </button>
+                            </div>
+                            {reviewLinkSuccessNote ? (
+                              <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={13} />
+                                {reviewLinkSuccessNote}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-slate-500 leading-normal">
+                                Format link wajib: <span className="font-mono text-blue-600 font-semibold">https://maps.app.goo.gl/...</span>, lalu klik <strong>Generate</strong> untuk mengubahnya jadi link ulasan langsung.
+                              </p>
+                            )}
+                          </div>
                         )}
-                      </button>
-                    </form>
 
-                    {/* Owner Freedom Reassurance for Seller Activation */}
-                    <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
-                      <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset via Dashboard:</strong>
-                        Setelah diaktifkan, pemilik email dapat kapan saja mengedit link, mengubah modus kartu, atau menghapus & reset kartu secara mandiri melalui Dashboard Ony.
+                        {/* Conditional: Custom URL Redirect */}
+                        {cardPurpose === 'custom_redirect' && (
+                          <div className="animate-in fade-in duration-150 space-y-2">
+                            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
+                              URL Tujuan Redirect
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <Link2 size={16} />
+                              </div>
+                              <input
+                                type="url"
+                                placeholder="https://wa.me/628... atau URL apapun"
+                                value={customRedirectUrl}
+                                onChange={(e) => setCustomRedirectUrl(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-xs text-slate-900 outline-none transition-all font-sans"
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-500 leading-normal">
+                              Tap/scan kartu akan langsung redirect ke URL ini — WhatsApp, website, Instagram, Tokopedia, Shopee, dll.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Submit Button */}
+                        <button
+                          type="submit"
+                          disabled={submittingSeller}
+                          className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-ony-gradient text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 hover:opacity-95 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 font-display mt-2"
+                        >
+                          {submittingSeller ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              <span>Mengaktifkan Kartu...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={16} />
+                              <span>Submit & Aktifkan Kartu</span>
+                              <ArrowRight size={16} className="ml-auto" />
+                            </>
+                          )}
+                        </button>
+                      </form>
+
+                      {/* Owner Freedom Reassurance for Seller Activation */}
+                      <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-left text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+                        <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-slate-800 font-bold block mb-0.5 font-display">Bebas Atur & Reset via Dashboard:</strong>
+                          Setelah diaktifkan, pemilik email dapat kapan saja mengedit link, mengubah modus kartu, atau menghapus & reset kartu secara mandiri melalui Dashboard Ony.
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
                 </div>
               )}
             </div>
@@ -1610,11 +1605,10 @@ export default function ClaimPage({
               <button
                 type="button"
                 onClick={() => setMapsModalTab('search')}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  mapsModalTab === 'search'
-                    ? 'bg-white text-amber-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${mapsModalTab === 'search'
+                  ? 'bg-white text-amber-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 <Search size={14} />
                 <span>Cari Bisnis</span>
@@ -1622,11 +1616,10 @@ export default function ClaimPage({
               <button
                 type="button"
                 onClick={() => setMapsModalTab('tutorial')}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  mapsModalTab === 'tutorial'
-                    ? 'bg-white text-amber-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${mapsModalTab === 'tutorial'
+                  ? 'bg-white text-amber-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 <HelpCircle size={14} />
                 <span>Panduan Link</span>
