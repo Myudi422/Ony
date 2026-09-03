@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   Wifi, ArrowRight, CreditCard, Tag, Tv, Key, ShieldCheck, Zap,
   Link2, ShoppingCart, CheckCircle2, BarChart2, QrCode, RefreshCw, Sparkles,
-  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle, PlayCircle, X, Maximize2
+  UserCheck, Store, Mail, MapPin, AlertCircle, Loader2, MessageCircle, PlayCircle, X, Maximize2, HelpCircle
 } from 'lucide-react'
 
 const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = {
@@ -18,6 +18,18 @@ const MEDIA_LABELS: Record<string, { icon: React.ElementType; name: string }> = 
   qr_keychain: { icon: Key,        name: 'NFC Keychain' },
   digital_qr:  { icon: CreditCard, name: 'Digital Card' },
 }
+
+function isValidGoogleMapsUrl(url: string): boolean {
+  if (!url || !url.trim()) return false
+  const clean = url.trim().toLowerCase()
+  return (
+    clean.includes('maps.app.goo.gl') ||
+    clean.includes('goo.gl/maps') ||
+    clean.includes('writereview?placeid=')
+  )
+}
+
+
 
 declare global {
   interface Window {
@@ -51,6 +63,7 @@ export default function ClaimPage({
 
   // Tutorial Video Modal State & Ref
   const [showTutorialModal, setShowTutorialModal] = useState(false)
+  const [showMapsHelpModal, setShowMapsHelpModal] = useState(false)
   const tutorialVideoRef = useRef<HTMLVideoElement>(null)
 
   // Fullscreen / Landscape trigger for mobile devices
@@ -126,10 +139,17 @@ export default function ClaimPage({
                     activePurpose === 'custom_redirect' ? (customRedirectUrl || storedRedirectUrl || '') : ''
 
     // Strict URL validation if purpose is NOT business_card (profile)
-    if (activePurpose === 'google_review' && !targetUrl.trim()) {
-      setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengklaim kartu.')
-      setClaimingOwner(false)
-      return
+    if (activePurpose === 'google_review') {
+      if (!targetUrl.trim()) {
+        setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengklaim kartu.')
+        setClaimingOwner(false)
+        return
+      }
+      if (!isValidGoogleMapsUrl(targetUrl)) {
+        setClaimOwnerError('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+        setClaimingOwner(false)
+        return
+      }
     }
     if (activePurpose === 'custom_redirect' && !targetUrl.trim()) {
       setClaimOwnerError('Wajib memasukkan URL tujuan redirect sebelum mengklaim kartu.')
@@ -250,10 +270,17 @@ export default function ClaimPage({
     let targetUrl = payPurpose === 'google_review' ? payGoogleMapsUrl.trim() :
                     payPurpose === 'custom_redirect' ? payCustomRedirectUrl.trim() : ''
 
-    if (payPurpose === 'google_review' && !targetUrl) {
-      setPayFormError('Link Google Maps bisnis kamu wajib diisi.')
-      setLoadingPay(false)
-      return
+    if (payPurpose === 'google_review') {
+      if (!targetUrl) {
+        setPayFormError('Link Google Maps bisnis kamu wajib diisi.')
+        setLoadingPay(false)
+        return
+      }
+      if (!isValidGoogleMapsUrl(targetUrl)) {
+        setPayFormError('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+        setLoadingPay(false)
+        return
+      }
     }
 
     if (payPurpose === 'custom_redirect' && !targetUrl) {
@@ -386,6 +413,11 @@ export default function ClaimPage({
   const handleGenerateReviewLink = async (targetInput?: string) => {
     const target = targetInput || googleMapsUrl
     if (!target || !target.trim()) return
+    if (!isValidGoogleMapsUrl(target)) {
+      setReviewLinkSuccessNote(null)
+      alert('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+      return
+    }
     setGeneratingReviewLink(true)
     setReviewLinkSuccessNote(null)
     try {
@@ -415,9 +447,15 @@ export default function ClaimPage({
       return
     }
 
-    if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
-      setSellerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan kartu.')
-      return
+    if (cardPurpose === 'google_review') {
+      if (!googleMapsUrl.trim()) {
+        setSellerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan kartu.')
+        return
+      }
+      if (!isValidGoogleMapsUrl(googleMapsUrl)) {
+        setSellerError('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+        return
+      }
     }
 
     if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
@@ -693,9 +731,19 @@ export default function ClaimPage({
                   {/* Google Maps / Target URL Input */}
                   {payPurpose === 'google_review' && (
                     <div>
-                      <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 font-display">
-                        Link Google Maps Bisnis <span className="text-rose-500">*</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
+                          Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowMapsHelpModal(true)}
+                          className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
+                        >
+                          <HelpCircle size={13} />
+                          <span>Cara Ambil Link?</span>
+                        </button>
+                      </div>
                       <div className="relative">
                         <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -712,6 +760,10 @@ export default function ClaimPage({
                           type="button"
                           onClick={async () => {
                             if (!payGoogleMapsUrl.trim()) return
+                            if (!isValidGoogleMapsUrl(payGoogleMapsUrl)) {
+                              setPayFormError('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+                              return
+                            }
                             setPayGeneratingReviewLink(true)
                             setPayFormError(null)
                             try {
@@ -741,7 +793,7 @@ export default function ClaimPage({
                         </p>
                       ) : (
                         <p className="text-[10px] text-slate-500 mt-1 leading-normal">
-                          Paste link lokasi Google Maps bisnis kamu, lalu klik <strong>Generate</strong>.
+                          Format link wajib: <span className="font-mono text-amber-700 font-semibold">https://maps.app.goo.gl/...</span>, lalu klik <strong>Generate</strong>.
                         </p>
                       )}
                     </div>
@@ -922,9 +974,19 @@ export default function ClaimPage({
                       {/* Step 2: Conditional URL inputs */}
                       {cardPurpose === 'google_review' && (
                         <div className="animate-in fade-in duration-150 space-y-2">
-                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
-                            Link Google Maps Bisnis
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
+                              Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowMapsHelpModal(true)}
+                              className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
+                            >
+                              <HelpCircle size={13} />
+                              <span>Cara Ambil Link?</span>
+                            </button>
+                          </div>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                               <MapPin size={15} />
@@ -955,7 +1017,7 @@ export default function ClaimPage({
                             </p>
                           ) : (
                             <p className="text-[10px] text-slate-500 leading-normal">
-                              Paste link Google Maps bisnis kamu, klik <strong>Generate</strong> — sistem auto-ubah ke link ulasan langsung.
+                              Format link wajib: <span className="font-mono text-blue-600 font-semibold">https://maps.app.goo.gl/...</span>, klik <strong>Generate</strong> untuk ubah ke ulasan langsung.
                             </p>
                           )}
                         </div>
@@ -1078,9 +1140,19 @@ export default function ClaimPage({
                       {/* Step 2: Conditional URL inputs */}
                       {cardPurpose === 'google_review' && (
                         <div className="animate-in fade-in duration-150 space-y-2">
-                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
-                            Link Google Maps Bisnis
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
+                              Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowMapsHelpModal(true)}
+                              className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
+                            >
+                              <HelpCircle size={13} />
+                              <span>Cara Ambil Link?</span>
+                            </button>
+                          </div>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                               <MapPin size={15} />
@@ -1111,7 +1183,7 @@ export default function ClaimPage({
                             </p>
                           ) : (
                             <p className="text-[10px] text-slate-500 leading-normal">
-                              Paste link Google Maps bisnis kamu, klik <strong>Generate</strong> — sistem auto-ubah ke link ulasan langsung.
+                              Format link wajib: <span className="font-mono text-blue-600 font-semibold">https://maps.app.goo.gl/...</span>, klik <strong>Generate</strong> untuk ubah ke ulasan langsung.
                             </p>
                           )}
                         </div>
@@ -1154,10 +1226,17 @@ export default function ClaimPage({
                           href={`/login?callbackUrl=${encodeURIComponent(googleLoginCallbackUrl)}&claim=${code}`}
                           onClick={(e) => {
                             setClaimOwnerError(null)
-                            if (cardPurpose === 'google_review' && !googleMapsUrl.trim()) {
-                              e.preventDefault()
-                              setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan dengan Google.')
-                              return
+                            if (cardPurpose === 'google_review') {
+                              if (!googleMapsUrl.trim()) {
+                                e.preventDefault()
+                                setClaimOwnerError('Wajib memasukkan link Google Maps bisnis kamu sebelum mengaktifkan dengan Google.')
+                                return
+                              }
+                              if (!isValidGoogleMapsUrl(googleMapsUrl)) {
+                                e.preventDefault()
+                                setClaimOwnerError('Link Google Maps tidak valid! Wajib menggunakan link bagikan resmi dari Google Maps (contoh: https://maps.app.goo.gl/...).')
+                                return
+                              }
                             }
                             if (cardPurpose === 'custom_redirect' && !customRedirectUrl.trim()) {
                               e.preventDefault()
@@ -1314,9 +1393,19 @@ export default function ClaimPage({
                       {/* Conditional: Google Maps Review */}
                       {cardPurpose === 'google_review' && (
                         <div className="animate-in fade-in duration-150 space-y-2">
-                          <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 font-display">
-                            Link / Share Google Maps <span className="text-slate-400 font-normal">(Auto Review Link Generator)</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
+                              Link / Share Google Maps <span className="text-rose-500">*</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowMapsHelpModal(true)}
+                              className="inline-flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer transition-colors"
+                            >
+                              <HelpCircle size={13} />
+                              <span>Cara Ambil Link?</span>
+                            </button>
+                          </div>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                               <MapPin size={16} />
@@ -1348,7 +1437,7 @@ export default function ClaimPage({
                             </p>
                           ) : (
                             <p className="text-[10px] text-slate-500 leading-normal">
-                              Paste link Google Maps (seperti <span className="font-mono text-blue-600">https://maps.app.goo.gl/...</span>) lalu klik <strong>Generate</strong> untuk mengubahnya jadi link ulasan langsung.
+                              Format link wajib: <span className="font-mono text-blue-600 font-semibold">https://maps.app.goo.gl/...</span>, lalu klik <strong>Generate</strong> untuk mengubahnya jadi link ulasan langsung.
                             </p>
                           )}
                         </div>
@@ -1489,6 +1578,45 @@ export default function ClaimPage({
                 Tutup
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL TUTORIAL MAPS */}
+      {showMapsHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm bg-white rounded-2xl p-5 border border-slate-200 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm font-display">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <MapPin size={18} />
+                </div>
+                <span>Cara Ambil Link Maps</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMapsHelpModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-700 font-medium leading-relaxed">
+              <li>Buka aplikasi atau website <strong className="text-slate-900">Google Maps</strong>.</li>
+              <li>Cari dan pilih <strong className="text-slate-900">lokasi / bisnis</strong> kamu.</li>
+              <li>Klik tombol <strong className="text-slate-900">Bagikan (Share)</strong>.</li>
+              <li>Pilih <strong className="text-slate-900">Salin Link</strong> (format link wajib: <code className="bg-amber-50 text-amber-900 font-mono px-1 py-0.5 rounded text-[10px] border border-amber-200 font-bold">https://maps.app.goo.gl/...</code>).</li>
+              <li>Tempel / Paste link tersebut ke kolom di atas.</li>
+            </ol>
+
+            <button
+              type="button"
+              onClick={() => setShowMapsHelpModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold font-display transition-all cursor-pointer shadow-xs"
+            >
+              Saya Mengerti
+            </button>
           </div>
         </div>
       )}

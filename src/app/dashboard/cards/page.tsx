@@ -349,8 +349,22 @@ export default function CardsPage() {
   const [generatingReview, setGeneratingReview] = useState(false)
   const [reviewNote, setReviewNote] = useState<string | null>(null)
 
+  const isValidGoogleMapsUrl = (url: string): boolean => {
+    if (!url || !url.trim()) return false
+    const clean = url.trim().toLowerCase()
+    return (
+      clean.includes('maps.app.goo.gl') ||
+      clean.includes('goo.gl/maps') ||
+      clean.includes('writereview?placeid=')
+    )
+  }
+
   const handleGenerateReviewLink = async () => {
     if (!selected?.redirect_url) return
+    if (!isValidGoogleMapsUrl(selected.redirect_url)) {
+      showToast('Link Google Maps tidak valid! Wajib link bagikan (contoh: https://maps.app.goo.gl/...)', 'error')
+      return
+    }
     setGeneratingReview(true)
     setReviewNote(null)
 
@@ -389,22 +403,25 @@ export default function CardsPage() {
       let finalRedirectUrl = selected.redirect_url
 
       // Auto convert raw Google Maps URL to direct review link if mode is google_review
-      if (
-        (selected.mode === 'google_review' || selected.mode === 'review') &&
-        selected.redirect_url &&
-        !selected.redirect_url.includes('writereview?placeid=')
-      ) {
-        try {
-          const genRes = await fetch('/api/tools/google-review-generator', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: selected.redirect_url }),
-          })
-          const genData = await genRes.json()
-          if (genData.success && genData.reviewUrl) {
-            finalRedirectUrl = genData.reviewUrl
-          }
-        } catch (_) { }
+      if (selected.mode === 'google_review' || selected.mode === 'review') {
+        if (selected.redirect_url && !isValidGoogleMapsUrl(selected.redirect_url)) {
+          showToast('Link Google Maps tidak valid! Wajib link bagikan (contoh: https://maps.app.goo.gl/...)', 'error')
+          setSavingCard(false)
+          return
+        }
+        if (selected.redirect_url && !selected.redirect_url.includes('writereview?placeid=')) {
+          try {
+            const genRes = await fetch('/api/tools/google-review-generator', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ input: selected.redirect_url }),
+            })
+            const genData = await genRes.json()
+            if (genData.success && genData.reviewUrl) {
+              finalRedirectUrl = genData.reviewUrl
+            }
+          } catch (_) { }
+        }
       }
 
       const res = await fetch(`/api/cards/${selected.id}`, {
