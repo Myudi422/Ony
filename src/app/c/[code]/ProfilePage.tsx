@@ -1,9 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { ExternalLink, CreditCard, Tag, Tv, Key, QrCode } from 'lucide-react'
-import { LINK_ICONS } from '@/lib/utils'
+import { ExternalLink, CreditCard, Tag, Tv, Key, QrCode, Sparkles } from 'lucide-react'
 
 const MEDIA_ICONS: Record<string, React.ElementType> = {
   nfc_card: CreditCard,
@@ -40,26 +38,21 @@ export default function ProfilePage({
   }
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center text-slate-900 py-8 px-4 sm:px-6 selection:bg-ony-blue selection:text-white">
-      {/* Background ambient lighting */}
+    <div className="min-h-[100dvh] bg-slate-50/90 flex items-center justify-center text-slate-900 py-10 px-4 sm:px-6 selection:bg-slate-900 selection:text-white relative overflow-hidden">
+      {/* Ambient Glows */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[380px] h-[380px] bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-10 left-1/3 w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-3xl" />
       </div>
 
-      {/* Main Profile Viewport Container */}
-      <div className="relative w-full max-w-md my-auto">
+      {/* Main Bento Container */}
+      <div className="relative w-full max-w-md my-auto space-y-3.5">
         
-        {/* Brand Header */}
-        <div className="flex justify-center mb-6">
-          <Link href="/" className="inline-block transition-transform hover:scale-105">
-            <Image src="/logo.png" alt="Ony" width={150} height={44} className="h-10 w-auto object-contain rounded" priority />
-          </Link>
-        </div>
-
-        {/* Profile Card Header */}
-        <div className="card-surface p-7 mb-4 text-center shadow-lg bg-white border border-slate-200/90 rounded-3xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-ony-gradient" />
-
+        {/* Bento Card 1: User Profile Header */}
+        <div className="relative p-6 sm:p-7 bg-white/90 backdrop-blur-md rounded-3xl border border-slate-200/90 shadow-xl text-center overflow-hidden group">
+          {/* Subtle Accent Glow */}
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500" />
+          
           {/* Avatar Container */}
           <div className="relative w-24 h-24 mx-auto mb-4">
             {user.avatar_url ? (
@@ -67,26 +60,31 @@ export default function ProfilePage({
                 src={user.avatar_url}
                 alt={user.name}
                 fill
-                className="rounded-full object-cover ring-4 ring-blue-100 shadow-md"
+                className="rounded-full object-cover ring-4 ring-slate-100 shadow-md group-hover:scale-105 transition-transform duration-300"
               />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-ony-gradient flex items-center justify-center text-2xl font-bold text-white shadow-md font-display">
+              <div className="w-24 h-24 rounded-full bg-slate-900 flex items-center justify-center text-2xl font-black text-white shadow-md font-display group-hover:scale-105 transition-transform duration-300">
                 {initials}
               </div>
             )}
             {/* NFC Card Badge Indicator */}
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border-2 border-blue-200 shadow-md flex items-center justify-center">
-              <MediaIcon size={14} className="text-ony-blue" />
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border-2 border-slate-100 shadow-md flex items-center justify-center text-slate-800">
+              <MediaIcon size={14} />
             </div>
           </div>
 
-          <h1 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight font-display">{user.name}</h1>
-          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{card.card_name}</p>
+          {/* User Info */}
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-1.5 tracking-tight font-display">{user.name}</h1>
+          
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-slate-600 text-[11px] font-extrabold tracking-wider font-display uppercase">
+            <Sparkles size={12} className="text-amber-500" />
+            <span>{card.card_name}</span>
+          </div>
         </div>
 
-        {/* Dynamic Links Stack */}
+        {/* Dynamic Links Stack (Sleek Uniform Shape Buttons) */}
         {links.length > 0 ? (
-          <div className="space-y-3 mb-4">
+          <div className="space-y-3">
             {links.map((link) => (
               <a
                 key={link.id}
@@ -95,29 +93,32 @@ export default function ProfilePage({
                 rel="noopener noreferrer"
                 onClick={() => handleLinkClick(link.id)}
                 id={`link-${link.id}`}
-                className="flex items-center gap-3.5 px-5 py-4 rounded-2xl bg-white border border-slate-200/90
-                  hover:border-blue-300 hover:bg-blue-50/40 active:scale-[0.98] shadow-xs
-                  transition-all duration-200 group"
+                className="group w-full py-4 px-5 rounded-2xl bg-white border border-slate-200/90
+                  hover:bg-slate-900 hover:text-white hover:border-slate-900 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]
+                  shadow-xs transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer"
               >
-                <span className="text-xl shrink-0">
-                  {LINK_ICONS[link.icon_type] ?? '🔗'}
+                <span className="font-extrabold text-sm font-display flex-1 leading-snug truncate">
+                  {link.title}
                 </span>
-                <span className="text-slate-800 font-bold text-sm flex-1">{link.title}</span>
-                <ExternalLink size={15} className="text-slate-400 group-hover:text-ony-blue transition-colors shrink-0" />
+                <div className="w-7 h-7 rounded-xl bg-slate-100 group-hover:bg-white/10 text-slate-400 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                  <ExternalLink size={14} />
+                </div>
               </a>
             ))}
           </div>
         ) : (
-          <div className="card-surface text-center py-8 text-slate-500 text-sm mb-4 bg-white border border-slate-200 rounded-2xl">
-            Belum ada link yang ditambahkan.
+          <div className="p-8 text-center text-slate-500 text-xs font-medium bg-white/90 backdrop-blur-xs border border-slate-200 rounded-3xl shadow-xs font-sans">
+            Belum ada link tautan yang ditambahkan.
           </div>
         )}
 
+        {/* Footer: Ony Ecosystem */}
+        <footer className="pt-6 pb-2 text-center">
+          <p className="text-[11px] font-medium text-slate-400 font-sans">
+            &copy; 2026 Ony Ecosystem. All rights reserved.
+          </p>
+        </footer>
 
-        {/* Footer */}
-        <div className="text-center pt-2 pb-1">
-          <p className="text-xs text-slate-400">&copy; 2026 Ony</p>
-        </div>
       </div>
     </div>
   )

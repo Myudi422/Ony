@@ -82,12 +82,9 @@ export async function POST(req: NextRequest) {
     url = `https://${url}`
   }
 
-  const icon_type = detectIconType(url, title, body.icon_type || body.platform)
-
   const linkPayload: Record<string, unknown> = {
     title: title.trim(),
     url: url.trim(),
-    icon_type,
     is_active: true,
     created_at: new Date().toISOString(),
   }
@@ -99,22 +96,13 @@ export async function POST(req: NextRequest) {
     .insert(linkPayload)
     .select()
 
-  // Fallback 1: retry without card_id
-  if (error) {
+  // Fallback 1: retry without card_id if card_id error
+  if (error && (error.message?.includes('card_id') || error.code === '42703')) {
     delete linkPayload.card_id
     const retry1 = await supabaseAdmin.from('links').insert(linkPayload).select()
     if (!retry1.error && retry1.data) {
       data = retry1.data
       error = null
-    } else {
-      // Fallback 2: retry with card_id only
-      delete linkPayload.user_id
-      if (card_id) linkPayload.card_id = card_id
-      const retry2 = await supabaseAdmin.from('links').insert(linkPayload).select()
-      if (!retry2.error && retry2.data) {
-        data = retry2.data
-        error = null
-      }
     }
   }
 
@@ -163,7 +151,6 @@ export async function PATCH(req: NextRequest) {
   const updateFields: Record<string, unknown> = {}
   if (typeof is_active === 'boolean') updateFields.is_active = is_active
   if (title) updateFields.title = title.trim()
-  if (body.icon_type) updateFields.icon_type = body.icon_type
   if (url) {
     if (!/^https?:\/\//i.test(url) && !url.startsWith('mailto:') && !url.startsWith('tel:')) {
       url = `https://${url}`
