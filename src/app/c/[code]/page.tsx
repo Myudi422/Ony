@@ -183,10 +183,15 @@ export default async function CardPage({ params, searchParams }: Props) {
             }
           }
 
-          const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
-          const cardMode = isDirectMode ? 'direct' : 'profile'
-          const redirectUrl = isDirectMode ? (targetUrl || 'https://maps.google.com') : null
-          const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
+          let cardMode = 'profile'
+          if (purpose === 'google_review') {
+            cardMode = 'google_review'
+          } else if (purpose === 'custom_redirect') {
+            cardMode = 'direct'
+          }
+
+          const redirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : null
+          const cardName = purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
 
           await supabaseAdmin
             .from('cards')
@@ -215,7 +220,7 @@ export default async function CardPage({ params, searchParams }: Props) {
 
           isUnpaidCard = false
 
-          if (isDirectMode && redirectUrl) {
+          if ((cardMode === 'google_review' || cardMode === 'direct') && redirectUrl) {
             targetRedirectUrl = redirectUrl
           }
         }

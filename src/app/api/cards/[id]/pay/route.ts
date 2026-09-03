@@ -78,10 +78,15 @@ export async function POST(
     }
   }
 
-  const isDirectMode = purpose === 'google_review' || purpose === 'custom_redirect'
-  const cardMode = isDirectMode ? 'direct' : 'profile'
-  const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : (isDirectMode ? 'https://maps.google.com' : null)
-  const cardName = purpose === 'google_review' ? 'Google Review' : purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'
+  let cardMode = 'profile'
+  if (purpose === 'google_review') {
+    cardMode = 'google_review'
+  } else if (purpose === 'custom_redirect') {
+    cardMode = 'direct'
+  }
+
+  const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : null
+  const cardName = purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
 
   // Pre-update card with user ownership and target link
   const cardUpdate: Record<string, unknown> = {
