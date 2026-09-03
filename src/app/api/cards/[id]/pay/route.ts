@@ -88,17 +88,8 @@ export async function POST(
   const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : null
   const cardName = purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
 
-  // Pre-update card with user ownership and target link
-  const cardUpdate: Record<string, unknown> = {
-    mode: cardMode,
-    redirect_url: finalRedirectUrl,
-    card_name: cardName,
-    updated_at: new Date().toISOString(),
-  }
-  if (targetUserId) {
-    cardUpdate.user_id = targetUserId
-  }
-  await supabaseAdmin.from('cards').update(cardUpdate).eq('id', card.id)
+  // DO NOT pre-update cards table here!
+  // Card status & redirect_url MUST ONLY be updated after payment is verified (via webhooks or check-payment).
 
   // 2. Fetch Live Dynamic Price
   const dynamicPricing = await getLivePricing()

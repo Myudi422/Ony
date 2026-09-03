@@ -140,6 +140,7 @@ export async function POST(req: NextRequest) {
 
       const updateData: Record<string, unknown> = {
         status: 'active',
+        payment_status: 'paid',
         mode: cardMode,
         redirect_url: finalRedirectUrl,
         card_name: cardName,
