@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic'
 
 const checkIsAdmin = (token: Record<string, unknown> | null) => {
   if (!token) return false
-  const adminEmail = (process.env.ADMIN_EMAIL ?? 'myudi422@gmail.com').toLowerCase().trim()
-  if (typeof token.email === 'string' && token.email.toLowerCase().trim() === adminEmail) return true
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim()
+  if (adminEmail && typeof token.email === 'string' && token.email.toLowerCase().trim() === adminEmail) return true
   return token.role === 'admin' || token.role === 'superadmin'
 }
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') ?? '10')
   const search = searchParams.get('search') ?? ''
 
-  let query = supabaseAdmin.from('users').select('*', { count: 'exact' })
+  let query = supabaseAdmin.from('users').select('*, cards(count)', { count: 'exact' })
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`)
@@ -34,7 +34,14 @@ export async function GET(req: NextRequest) {
   const { data, count, error } = await query.range(from, to).order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ users: data, total: count, page, limit })
+
+  const formattedUsers = (data ?? []).map((u: any) => ({
+    ...u,
+    card_count: u.cards?.[0]?.count ?? 0,
+    cards: undefined,
+  }))
+
+  return NextResponse.json({ users: formattedUsers, total: count, page, limit })
 }
 
 export async function PATCH(req: NextRequest) {
