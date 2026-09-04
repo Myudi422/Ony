@@ -1139,7 +1139,7 @@ export default function ClaimPage({
                         <div className="animate-in fade-in duration-150 space-y-2">
                           <div className="flex items-center justify-between mb-1">
                             <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider font-display">
-                              Link Google Maps Bisnis <span className="text-rose-500">*</span>
+                              Link Maps <span className="text-rose-500">*</span>
                             </label>
                             <button
                               type="button"
