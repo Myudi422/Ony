@@ -193,6 +193,12 @@
       "namedRegex": "^/dashboard/store(?:/)?$"
     },
     {
+      "page": "/google-review",
+      "regex": "^/google\\-review(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/google\\-review(?:/)?$"
+    },
+    {
       "page": "/login",
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
