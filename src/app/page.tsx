@@ -42,12 +42,12 @@ function Navbar() {
             ['Cara Kerja', '#how-it-works'],
             ['Kategori', '#use-cases'],
             ['Fitur', '#features'],
-            ['Google Review', '#qr-review'],
+            ['Google Review', '/google-review'],
             ['Perbandingan', '#comparison'],
           ].map(([label, href]) => (
-            <a key={href} href={href} className="text-slate-600 hover:text-slate-900 text-xs sm:text-sm font-medium transition-colors">
+            <Link key={href} href={href} className="text-slate-600 hover:text-slate-900 text-xs sm:text-sm font-medium transition-colors">
               {label}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -90,11 +90,11 @@ function Navbar() {
             ['Cara Kerja', '#how-it-works'],
             ['Kategori', '#use-cases'],
             ['Fitur', '#features'],
-            ['Google Review', '#qr-review'],
+            ['Google Review', '/google-review'],
             ['Perbandingan', '#comparison'],
           ].map(([label, href]) => (
-            <a key={href} href={href} onClick={() => setMobileOpen(false)}
-              className="text-slate-800 text-sm font-medium py-1.5 border-b border-slate-100">{label}</a>
+            <Link key={href} href={href} onClick={() => setMobileOpen(false)}
+              className="text-slate-800 text-sm font-medium py-1.5 border-b border-slate-100">{label}</Link>
           ))}
           <div className="pt-2 flex flex-col gap-2">
             {session ? (
@@ -311,14 +311,24 @@ export default function LandingPage() {
                 <span>Cocok untuk: <strong className="text-slate-800">{currentCat.target}</strong></span>
               </div>
             </div>
-            <a
-              href="https://shopee.co.id/onynfc"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full md:w-auto px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 shrink-0 transition-all"
-            >
-              Lihat di Shopee <ExternalLink size={13} />
-            </a>
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+              {activeCategory === 'review-card' && (
+                <Link
+                  href="/google-review"
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-ony-blue hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  Panduan &amp; Grosir Google Review <ArrowRight size={13} />
+                </Link>
+              )}
+              <a
+                href="https://shopee.co.id/onynfc"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all"
+              >
+                Lihat di Shopee <ExternalLink size={13} />
+              </a>
+            </div>
           </div>
         </div>
       </section>
