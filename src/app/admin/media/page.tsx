@@ -140,7 +140,7 @@ export default function AdminMediaPage() {
       ])
       setMockupCanvasUrl(frontCanvas.toDataURL('image/png'))
       setMockupBackCanvasUrl(backCanvas.toDataURL('image/png'))
-    } catch (_) {}
+    } catch (_) { }
     setMockupLoading(false)
   }
 
@@ -176,7 +176,7 @@ export default function AdminMediaPage() {
     setPdfProgress(null)
   }
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ony.my.id'
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -198,7 +198,7 @@ export default function AdminMediaPage() {
       const d = await fetch(`/api/admin/media?${queryParams}`).then(r => r.json())
       setCards(d.cards ?? [])
       setTotal(d.total ?? 0)
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false)
   }, [page, limit, debouncedSearch, filterPayment, filterStatus, startDate, endDate, sortDir])
 
@@ -207,7 +207,7 @@ export default function AdminMediaPage() {
     try {
       const d = await fetch('/api/admin/media?stats_only=true').then(r => r.json())
       if (d.stats) setStats(d.stats)
-    } catch (_) {}
+    } catch (_) { }
   }, [])
 
   // Refresh both cards + stats (after write ops or filter changes)
@@ -225,7 +225,7 @@ export default function AdminMediaPage() {
       setCards(d.cards ?? [])
       setTotal(d.total ?? 0)
       if (d.stats) setStats(d.stats)
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false)
   }, [page, limit, debouncedSearch, filterPayment, filterStatus, startDate, endDate, sortDir])
 
@@ -315,7 +315,7 @@ export default function AdminMediaPage() {
       setSelectedIds([])
       loadCards()
       loadStats()
-    } catch (_) {}
+    } catch (_) { }
     setDeleting(false)
   }
 
@@ -632,7 +632,7 @@ export default function AdminMediaPage() {
               </h2>
               <p className="text-slate-600 text-xs">Siap di-encode ke Chip NFC dan dicetak QR Code-nya</p>
             </div>
-            
+
             {/* Bulk Actions for Batch Generation */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -722,7 +722,7 @@ export default function AdminMediaPage() {
                   <span className={cn('text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mb-3 uppercase tracking-wider', isUnpaid ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200')}>
                     {isUnpaid ? '💳 BLANK' : '✓ BAYAR'}
                   </span>
-                  
+
                   <div className="flex flex-col gap-1.5 w-full mt-auto">
                     <div className="flex gap-1.5 w-full">
                       <button

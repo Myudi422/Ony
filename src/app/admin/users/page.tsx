@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
   const [cardsLoading, setCardsLoading] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ony.my.id'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
       const data = await res.json()
       setUsers(data.users ?? [])
       setTotal(data.total ?? 0)
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false)
   }, [page, search])
 
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
       const data = await res.json()
       setUserCards(data.cards ?? [])
       setCardsTotal(data.total ?? 0)
-    } catch (_) {}
+    } catch (_) { }
     setCardsLoading(false)
   }, [selectedUser, cardsPage, cardsSearch])
 
@@ -98,15 +98,15 @@ export default function AdminUsersPage() {
   }
 
   const STATUS_COLORS: Record<string, string> = {
-    active:    'text-emerald-700 border-emerald-200 bg-emerald-50',
+    active: 'text-emerald-700 border-emerald-200 bg-emerald-50',
     suspended: 'text-rose-700 border-rose-200 bg-rose-50',
-    banned:    'text-rose-800 border-rose-300 bg-rose-100',
+    banned: 'text-rose-800 border-rose-300 bg-rose-100',
     unclaimed: 'text-amber-700 border-amber-200 bg-amber-50',
   }
 
   const ROLE_COLORS: Record<string, string> = {
-    user:       'text-slate-600 bg-slate-100 border-slate-200',
-    admin:      'text-amber-700 bg-amber-50 border-amber-200',
+    user: 'text-slate-600 bg-slate-100 border-slate-200',
+    admin: 'text-amber-700 bg-amber-50 border-amber-200',
     superadmin: 'text-ony-blue bg-blue-50 border-blue-200',
   }
 
