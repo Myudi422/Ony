@@ -178,9 +178,17 @@ export async function POST(req: NextRequest) {
 
   // ── Prefix activation_code with card_number ─────────────────────────────
   // Format: ${card_number}${5-char random suffix} e.g. "123ABCDE"
-  // Non-fatal: if this step fails, cards still exist with their temp random codes.
+  // If the database trigger (trg_cards_auto_card_number_and_code) is installed,
+  // all cards are already atomically prefixed on INSERT.
+  // We check if all cards are already correctly prefixed:
+  const allPrefixed = Boolean(
+    data &&
+    data.length > 0 &&
+    data.every((c) => c.card_number != null && c.activation_code && c.activation_code.startsWith(String(c.card_number)))
+  )
+
   // ONLY newly inserted cards are touched — existing cards are never modified.
-  if (data && data.length > 0) {
+  if (!allPrefixed && data && data.length > 0) {
     try {
       const justInsertedIds = new Set(data.map((c) => c.id))
 
@@ -223,16 +231,20 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Batch UPDATE — only newly inserted cards
-      await Promise.all(
-        codeUpdates.map(({ id, activation_code }) =>
-          supabaseAdmin
-            .from('cards')
-            .update({ activation_code, updated_at: new Date().toISOString() })
-            .eq('id', id)
-            .eq('status', 'unclaimed') // safety guard: never touch claimed/active cards
+      // Batch UPDATE in small safe chunks to avoid subrequest exhaustion
+      const CHUNK_SIZE = 5
+      for (let i = 0; i < codeUpdates.length; i += CHUNK_SIZE) {
+        const chunk = codeUpdates.slice(i, i + CHUNK_SIZE)
+        await Promise.all(
+          chunk.map(({ id, activation_code }) =>
+            supabaseAdmin
+              .from('cards')
+              .update({ activation_code, updated_at: new Date().toISOString() })
+              .eq('id', id)
+              .eq('status', 'unclaimed') // safety guard: never touch claimed/active cards
+          )
         )
-      )
+      }
 
       // Re-fetch with updated codes so response reflects final codes
       const { data: refreshed } = await supabaseAdmin
