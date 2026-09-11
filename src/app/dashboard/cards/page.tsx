@@ -9,10 +9,11 @@ import {
   ShoppingBag, Check, Activity, Eye, RefreshCw, Power, Edit3,
   AlertCircle, CheckCircle2, X, MapPin, Star, Sparkles, User2, Link2,
   Search, SlidersHorizontal, ChevronLeft, ChevronRight, Zap, BarChart3,
-  Layers, ArrowUpDown, Send
+  Layers, ArrowUpDown, Send, Clipboard, HelpCircle
 } from 'lucide-react'
 import { cn, MEDIA_TYPE_LABELS, STATUS_COLORS, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import GoogleMapsHelpModal from '@/components/GoogleMapsHelpModal'
 
 interface Card {
   id: string
@@ -98,6 +99,12 @@ export default function CardsPage() {
   // Pagination for Tap Activity Logs
   const [logsPage, setLogsPage] = useState(1)
   const LOGS_PER_PAGE = 5
+
+  // Review Mode & Smart Filter States
+  const [reviewUrlInput, setReviewUrlInput] = useState('')
+  const [isFilterEnabled, setIsFilterEnabled] = useState(false)
+  const [complaintWaInput, setComplaintWaInput] = useState('')
+  const [showMapsHelpModal, setShowMapsHelpModal] = useState(false)
 
   // Notification Toast State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -246,7 +253,7 @@ export default function CardsPage() {
 
     if (filterMode !== 'all') {
       if (filterMode === 'google_review') {
-        result = result.filter(c => c.mode === 'google_review' || c.mode === 'review')
+        result = result.filter(c => c.mode === 'google_review' || c.mode === 'review' || c.mode === 'smart_review')
       } else {
         result = result.filter(c => c.mode === filterMode)
       }
@@ -276,21 +283,58 @@ export default function CardsPage() {
   const totalTaps = useMemo(() => cards.reduce((sum, c) => sum + (c.total_taps || 0), 0), [cards])
   const activeCardsCount = useMemo(() => cards.filter(c => c.status === 'active' || c.status === 'claimed').length, [cards])
 
+  // Synchronize Review Mode states when selected card changes
+  useEffect(() => {
+    if (selected) {
+      const rawUrl = selected.redirect_url || ''
+      const hashIdx = rawUrl.indexOf('#wa=')
+      const cleanUrl = hashIdx !== -1 ? rawUrl.substring(0, hashIdx) : rawUrl
+      const wa = (selected as any).complaint_wa || (hashIdx !== -1 ? rawUrl.substring(hashIdx + 4) : '')
+
+      setReviewUrlInput(cleanUrl)
+      setIsFilterEnabled(selected.mode === 'smart_review' || Boolean(wa))
+      setComplaintWaInput(wa)
+    }
+  }, [selected?.id])
+
   // Unsaved card setting changes detection
   const originalCard = useMemo(() => cards.find(c => c.id === selected?.id), [cards, selected?.id])
 
   const hasUnsavedCardChanges = useMemo(() => {
     if (!selected || !originalCard) return false
 
-    const normSelMode = (selected.mode === 'review' || selected.mode === 'google_review') ? 'google_review' : (selected.mode || 'profile')
-    const normOrigMode = (originalCard.mode === 'review' || originalCard.mode === 'google_review') ? 'google_review' : (originalCard.mode || 'profile')
+    const isCurrentlyReview = selected.mode === 'google_review' || selected.mode === 'review' || selected.mode === 'smart_review'
+    const wasOriginallyReview = originalCard.mode === 'google_review' || originalCard.mode === 'review' || originalCard.mode === 'smart_review'
+
+    if (isCurrentlyReview || wasOriginallyReview) {
+      if (isCurrentlyReview !== wasOriginallyReview) return true
+
+      const origRawUrl = originalCard.redirect_url || ''
+      const origHashIdx = origRawUrl.indexOf('#wa=')
+      const origCleanUrl = origHashIdx !== -1 ? origRawUrl.substring(0, origHashIdx) : origRawUrl
+      const origWa = (originalCard as any).complaint_wa || (origHashIdx !== -1 ? origRawUrl.substring(origHashIdx + 4) : '')
+      const origIsFilter = originalCard.mode === 'smart_review' || Boolean(origWa)
+
+      const targetWaClean = complaintWaInput.trim().replace(/\D/g, '')
+      const origWaClean = origWa.trim().replace(/\D/g, '')
+
+      return (
+        selected.card_name !== originalCard.card_name ||
+        reviewUrlInput.trim() !== origCleanUrl.trim() ||
+        isFilterEnabled !== origIsFilter ||
+        (isFilterEnabled && targetWaClean !== origWaClean)
+      )
+    }
+
+    const normSelMode = selected.mode || 'profile'
+    const normOrigMode = originalCard.mode || 'profile'
 
     return (
       selected.card_name !== originalCard.card_name ||
       normSelMode !== normOrigMode ||
       (selected.redirect_url ?? '') !== (originalCard.redirect_url ?? '')
     )
-  }, [selected, originalCard])
+  }, [selected, originalCard, reviewUrlInput, isFilterEnabled, complaintWaInput])
 
   // Fetch card details (links & logs) when selected card changes
   const loadCardDetails = useCallback(async () => {
@@ -359,10 +403,10 @@ export default function CardsPage() {
     )
   }
 
-  const handleGenerateReviewLink = async () => {
-    if (!selected?.redirect_url) return
-    if (!isValidGoogleMapsUrl(selected.redirect_url)) {
-      showToast('Link Google Maps tidak valid! Wajib link bagikan (contoh: https://maps.app.goo.gl/...)', 'error')
+  const handleGenerateReviewLink = async (targetOverride?: string) => {
+    const targetInput = targetOverride || reviewUrlInput.trim() || (selected?.redirect_url ? selected.redirect_url.split('#wa=')[0] : '')
+    if (!targetInput) return
+    if (!isValidGoogleMapsUrl(targetInput)) {
       return
     }
     setGeneratingReview(true)
@@ -372,12 +416,12 @@ export default function CardsPage() {
       const res = await fetch('/api/tools/google-review-generator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: selected.redirect_url }),
+        body: JSON.stringify({ input: targetInput }),
       })
       const data = await res.json()
       if (data.reviewUrl) {
-        setSelected({ ...selected, redirect_url: data.reviewUrl })
-        showToast('Link ulasan bintang 5 Google berhasil diproses!')
+        setReviewUrlInput(data.reviewUrl)
+        showToast('Link ulasan Google Maps berhasil diverifikasi!')
         if (data.note) setReviewNote(data.note)
       } else if (data.error) {
         showToast(data.error, 'error')
@@ -386,6 +430,39 @@ export default function CardsPage() {
       showToast('Gagal memproses link Google Maps.', 'error')
     }
     setGeneratingReview(false)
+  }
+
+  // Auto-generate Google Review link when valid link is entered/pasted
+  useEffect(() => {
+    const isReview = selected?.mode === 'google_review' || selected?.mode === 'review' || selected?.mode === 'smart_review'
+    if (!isReview) return
+    const clean = reviewUrlInput.trim()
+    if (!clean || clean.includes('writereview?placeid=')) return
+
+    if (isValidGoogleMapsUrl(clean) && !generatingReview) {
+      const timer = setTimeout(() => {
+        handleGenerateReviewLink(clean)
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [reviewUrlInput, selected?.mode])
+
+  // One-tap paste from clipboard
+  const handlePasteClipboard = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        const text = await navigator.clipboard.readText()
+        if (text) {
+          const clean = text.trim()
+          setReviewUrlInput(clean)
+          if (isValidGoogleMapsUrl(clean)) {
+            handleGenerateReviewLink(clean)
+          }
+        }
+      }
+    } catch (_) {
+      // Permission denied or clipboard empty
+    }
   }
 
   const [linkForm, setLinkForm] = useState({
@@ -401,26 +478,54 @@ export default function CardsPage() {
 
     try {
       let finalRedirectUrl = selected.redirect_url
+      let finalMode = selected.mode
 
-      // Auto convert raw Google Maps URL to direct review link if mode is google_review
-      if (selected.mode === 'google_review' || selected.mode === 'review') {
-        if (selected.redirect_url && !isValidGoogleMapsUrl(selected.redirect_url)) {
+      // Handle Review Maps Mode (direct Google Review or Smart Review Filter)
+      if (selected.mode === 'google_review' || selected.mode === 'review' || selected.mode === 'smart_review') {
+        let cleanUrl = reviewUrlInput.trim()
+
+        if (!cleanUrl) {
+          showToast('Wajib memasukkan link Google Maps bisnis kamu.', 'error')
+          setSavingCard(false)
+          return
+        }
+
+        if (!isValidGoogleMapsUrl(cleanUrl)) {
           showToast('Link Google Maps tidak valid! Wajib link bagikan (contoh: https://maps.app.goo.gl/...)', 'error')
           setSavingCard(false)
           return
         }
-        if (selected.redirect_url && !selected.redirect_url.includes('writereview?placeid=')) {
+
+        let cleanWa = complaintWaInput.trim().replace(/\D/g, '')
+        if (cleanWa.startsWith('0')) cleanWa = '62' + cleanWa.slice(1)
+
+        if (isFilterEnabled && !cleanWa) {
+          showToast('Nomor WhatsApp komplain wajib diisi jika filter ulasan diaktifkan!', 'error')
+          setSavingCard(false)
+          return
+        }
+
+        if (cleanUrl && !cleanUrl.includes('writereview?placeid=')) {
           try {
             const genRes = await fetch('/api/tools/google-review-generator', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ input: selected.redirect_url }),
+              body: JSON.stringify({ input: cleanUrl }),
             })
             const genData = await genRes.json()
             if (genData.success && genData.reviewUrl) {
-              finalRedirectUrl = genData.reviewUrl
+              cleanUrl = genData.reviewUrl
+              setReviewUrlInput(cleanUrl)
             }
           } catch (_) { }
+        }
+
+        if (isFilterEnabled) {
+          finalMode = 'smart_review'
+          finalRedirectUrl = `${cleanUrl}#wa=${cleanWa}`
+        } else {
+          finalMode = 'google_review'
+          finalRedirectUrl = cleanUrl
         }
       }
 
@@ -429,7 +534,7 @@ export default function CardsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_name: selected.card_name,
-          mode: selected.mode,
+          mode: finalMode,
           redirect_url: finalRedirectUrl,
         }),
       })
@@ -437,6 +542,15 @@ export default function CardsPage() {
       if (updated && updated.id) {
         setSelected(updated)
         setCards(cards.map(c => c.id === updated.id ? updated : c))
+
+        const rawUrl = updated.redirect_url || ''
+        const hashIdx = rawUrl.indexOf('#wa=')
+        const cleanUrl = hashIdx !== -1 ? rawUrl.substring(0, hashIdx) : rawUrl
+        const wa = (updated as any).complaint_wa || (hashIdx !== -1 ? rawUrl.substring(hashIdx + 4) : '')
+        setReviewUrlInput(cleanUrl)
+        setIsFilterEnabled(updated.mode === 'smart_review' || Boolean(wa))
+        setComplaintWaInput(wa)
+
         showToast('Perubahan informasi kartu berhasil disimpan!')
       } else {
         showToast('Gagal menyimpan perubahan kartu.', 'error')
@@ -1009,10 +1123,10 @@ export default function CardsPage() {
                           {/* 3. Google Review Maps Mode */}
                           <button
                             type="button"
-                            onClick={() => setSelected({ ...selected, mode: 'google_review' })}
+                            onClick={() => setSelected({ ...selected, mode: isFilterEnabled ? 'smart_review' : 'google_review' })}
                             className={cn(
                               'py-2.5 sm:py-3 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 text-center cursor-pointer',
-                              (selected.mode === 'google_review' || selected.mode === 'review')
+                              (selected.mode === 'google_review' || selected.mode === 'review' || selected.mode === 'smart_review')
                                 ? 'bg-white text-amber-600 shadow-xs border border-amber-200'
                                 : 'text-slate-600 hover:text-slate-900'
                             )}
@@ -1038,64 +1152,138 @@ export default function CardsPage() {
                         )}
 
                         {/* Google Review Maps Target URL & Converter */}
-                        {(selected.mode === 'google_review' || selected.mode === 'review') && (
-                          <div className="mt-4 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                        {(selected.mode === 'google_review' || selected.mode === 'review' || selected.mode === 'smart_review') && (
+                          <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-4">
                             <div>
-                              <label className="text-amber-900 text-xs font-bold mb-1 flex items-center justify-between">
+                              <label className="text-amber-950 text-xs font-bold mb-1.5 flex items-center justify-between">
                                 <span>Target URL Google Maps / Review</span>
-                              </label>
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <input
-                                  className="input-field text-sm bg-white flex-1 font-mono"
-                                  value={selected.redirect_url ?? ''}
-                                  onChange={e => setSelected({ ...selected, redirect_url: e.target.value })}
-                                  onBlur={() => {
-                                    if (selected.redirect_url && !selected.redirect_url.includes('writereview?placeid=')) {
-                                      handleGenerateReviewLink()
-                                    }
-                                  }}
-                                  placeholder="https://maps.app.goo.gl/... atau URL ulasan Google Maps"
-                                />
                                 <button
                                   type="button"
-                                  onClick={handleGenerateReviewLink}
-                                  disabled={generatingReview || !selected.redirect_url}
-                                  className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs cursor-pointer"
+                                  onClick={() => setShowMapsHelpModal(true)}
+                                  className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 font-bold transition-colors cursor-pointer"
                                 >
-                                  {generatingReview ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                  {generatingReview ? 'Memproses...' : 'Generate'}
+                                  <HelpCircle size={13} />
+                                  <span>Cara Ambil Link?</span>
                                 </button>
+                              </label>
+                              <div className="relative flex items-center">
+                                <input
+                                  className="input-field text-xs sm:text-sm bg-white flex-1 font-mono pr-11"
+                                  value={reviewUrlInput}
+                                  onChange={e => setReviewUrlInput(e.target.value)}
+                                  placeholder="Tempel link bagikan (contoh: https://maps.app.goo.gl/...)"
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                  {generatingReview ? (
+                                    <div className="p-1.5 text-amber-500 flex items-center" title="Memproses link ulasan...">
+                                      <RefreshCw size={15} className="animate-spin" />
+                                    </div>
+                                  ) : reviewUrlInput.includes('writereview?placeid=') ? (
+                                    <div className="p-1.5 text-emerald-500 flex items-center" title="Link ulasan terverifikasi">
+                                      <CheckCircle2 size={16} />
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={handlePasteClipboard}
+                                      title="Tempel link dari Clipboard"
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-ony-blue hover:bg-slate-100 transition-all cursor-pointer"
+                                    >
+                                      <Clipboard size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {generatingReview ? (
+                                <p className="mt-2 text-[11px] text-amber-800 bg-amber-100/70 p-2 rounded-lg border border-amber-200 flex items-center gap-1.5 font-medium">
+                                  <RefreshCw size={13} className="animate-spin" /> Memproses dan memverifikasi link ulasan Google Maps...
+                                </p>
+                              ) : reviewUrlInput.includes('writereview?placeid=') ? (
+                                <p className="mt-2 text-[11px] text-emerald-800 bg-emerald-50 p-2 rounded-lg border border-emerald-200 flex items-center gap-1.5 font-medium">
+                                  <CheckCircle2 size={14} className="text-emerald-600" /> Link ulasan Google Maps berhasil diverifikasi dan siap disimpan.
+                                </p>
+                              ) : (
+                                <p className="mt-2 text-[11px] text-amber-800/90 leading-relaxed">
+                                  ✨ <strong>Otomatis Convert:</strong> Cukup tempel link Google Maps bisnis kamu (<span className="font-mono text-amber-900">https://maps.app.goo.gl/...</span>). Sistem otomatis mengonversinya jadi link ulasan resmi Google!
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Smart Review Filter Section (Rating 1-4 ke WA, 5 ke Google) */}
+                            <div className="pt-3 border-t border-amber-200/70">
+                              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-amber-200/90 shadow-2xs space-y-3">
+                                <label className="flex items-start gap-3 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={isFilterEnabled}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setIsFilterEnabled(checked)
+                                      setSelected({
+                                        ...selected,
+                                        mode: checked ? 'smart_review' : 'google_review'
+                                      })
+                                    }}
+                                    className="w-4 h-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                      Filter Ulasan Negatif (Bintang 1–4 ke WhatsApp)
+                                    </span>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                                      Rating 5 langsung membuka form ulasan Google Maps. Rating 1–4 diarahkan ke WhatsApp untuk penyampaian komplain secara langsung & privat agar rating Google Anda tetap terjaga.
+                                    </p>
+                                  </div>
+                                </label>
+
+                                {isFilterEnabled && (
+                                  <div className="pt-2 pl-7 space-y-2">
+                                    <label className="text-slate-700 text-xs font-semibold block">
+                                      No. WA Aktif
+                                    </label>
+                                    <div className="relative">
+                                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <MessageCircle size={15} className="text-emerald-500" />
+                                      </div>
+                                      <input
+                                        type="tel"
+                                        value={complaintWaInput}
+                                        onChange={e => setComplaintWaInput(e.target.value)}
+                                        placeholder="Contoh: 081234567890 atau 6281234567890"
+                                        className="input-field text-xs sm:text-sm bg-white pl-9"
+                                      />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">
+                                      Format nomor bisa diawali <span className="font-mono text-slate-600">08...</span> atau <span className="font-mono text-slate-600">628...</span>. Pesan komplain dari pelanggan akan dikirim otomatis ke nomor ini.
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {reviewNote && (
-                              <p className="text-[11px] text-amber-800 bg-amber-100/60 p-2 rounded-lg border border-amber-200">
-                                ℹ️ {reviewNote}
-                              </p>
-                            )}
-                            <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                              ✨ <strong>Otomatis Convert:</strong> Cukup paste link Google Maps bisnis kamu (seperti <span className="font-mono text-amber-900">https://maps.app.goo.gl/...</span>). Sistem otomatis mengonversinya jadi link ulasan langsung saat disimpan!
-                            </p>
                           </div>
                         )}
                       </div>
 
-                      {/* Explicit Manual Save Button: Disabled when unchanged */}
+                      {/* Explicit Manual Save Button: Disabled when unchanged or still generating */}
                       <button
                         onClick={saveCardSettings}
-                        disabled={savingCard || !hasUnsavedCardChanges}
+                        disabled={savingCard || !hasUnsavedCardChanges || generatingReview}
                         className={cn(
                           "flex items-center justify-center gap-2 w-full py-3 text-sm font-bold transition-all rounded-xl",
-                          hasUnsavedCardChanges
+                          (hasUnsavedCardChanges && !generatingReview)
                             ? "btn-primary cursor-pointer shadow-sm"
                             : "bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed opacity-80"
                         )}
                       >
-                        <Save size={16} />
+                        {generatingReview ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
                         {savingCard
                           ? 'Menyimpan Perubahan...'
-                          : hasUnsavedCardChanges
-                          ? 'Simpan Perubahan Kartu'
-                          : 'Perubahan Kartu Tersimpan'}
+                          : generatingReview
+                            ? 'Menyiapkan Link Ulasan...'
+                            : hasUnsavedCardChanges
+                              ? 'Simpan Perubahan Kartu'
+                              : 'Perubahan Kartu Tersimpan'}
                       </button>
 
                       {/* Danger Zone: Unlink / Delete Card */}
@@ -1227,10 +1415,12 @@ export default function CardsPage() {
                         <ExternalLink size={18} />
                       </div>
                       <h3 className="text-xs font-bold text-slate-900 font-display mb-1">
-                        Mode Kartu: {selected.mode === 'direct' ? 'Direct Redirect' : 'Google Review Maps'}
+                        Mode Kartu: {selected.mode === 'direct' ? 'Direct Redirect' : (selected.mode === 'smart_review' ? 'Google Review Maps (Filter Ulasan Aktif)' : 'Google Review Maps')}
                       </h3>
                       <p className="text-[11px] text-slate-600 max-w-md mx-auto leading-relaxed">
-                        Saat kartu di-tap atau di-scan, browser akan <strong>langsung mengalihkan pelanggan</strong> ke target URL di atas tanpa menampilkan halaman profil link.
+                        {selected.mode === 'smart_review'
+                          ? 'Saat kartu di-tap atau di-scan, pelanggan akan diarahkan ke form rating ulasan. Rating 5 diarahkan langsung ke Google Maps, sedangkan rating 1–4 diarahkan ke WhatsApp komplain.'
+                          : 'Saat kartu di-tap atau di-scan, browser akan langsung mengalihkan pelanggan ke target URL di atas tanpa menampilkan halaman profil link.'}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-2">
                         Pilih <strong>Profile Mode</strong> di atas jika ingin menampilkan halaman profil berisi daftar link & kontak.
@@ -1551,6 +1741,12 @@ export default function CardsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Google Review & Maps Help Modal */}
+      <GoogleMapsHelpModal
+        isOpen={showMapsHelpModal}
+        onClose={() => setShowMapsHelpModal(false)}
+      />
     </div>
   )
 }

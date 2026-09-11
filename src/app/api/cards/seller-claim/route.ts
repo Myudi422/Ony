@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { code, email, purpose, googleMapsUrl } = await req.json()
+    const { code, email, purpose, googleMapsUrl, cardName: customCardName } = await req.json()
 
     if (!code || !email) {
       return NextResponse.json({ error: 'Kode aktivasi dan email wajib diisi.' }, { status: 400 })
@@ -75,10 +75,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Determine card configuration based on purpose
-    const isGoogleReview = purpose === 'google_review'
-    const cardMode = isGoogleReview ? 'direct' : 'profile'
+    const isSmartReview = purpose === 'smart_review'
+    const isGoogleReview = purpose === 'google_review' || isSmartReview
+    const cardMode = isSmartReview ? 'smart_review' : isGoogleReview ? 'direct' : 'profile'
     const redirectUrl = isGoogleReview ? (googleMapsUrl?.trim() || 'https://maps.google.com') : null
-    const cardName = isGoogleReview ? `Google Review — ${targetUser.name}` : `Kartu Nama — ${targetUser.name}`
+    const cardName = customCardName && String(customCardName).trim()
+      ? String(customCardName).trim()
+      : isSmartReview
+      ? `Smart Review — ${targetUser.name}`
+      : isGoogleReview
+      ? `Google Review — ${targetUser.name}`
+      : `Kartu Nama — ${targetUser.name}`
 
     // 4. Update card record to active and assigned to target user
     const { data: updatedCard, error: updateErr } = await supabaseAdmin

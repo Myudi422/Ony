@@ -86,7 +86,11 @@ export async function POST(
   }
 
   const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : null
-  const cardName = purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
+  const cardName = body?.cardName && String(body.cardName).trim()
+    ? String(body.cardName).trim()
+    : purpose === 'google_review'
+    ? 'Google Review'
+    : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
 
   // DO NOT pre-update cards table here!
   // Card status & redirect_url MUST ONLY be updated after payment is verified (via webhooks or check-payment).
@@ -105,6 +109,7 @@ export async function POST(
     userId: targetUserId,
     cardId: card.id,
     code: card.activation_code,
+    cardName,
   }
 
   // 3. Try Cashi.id API Primary Integration

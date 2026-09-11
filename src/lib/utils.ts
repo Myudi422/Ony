@@ -57,3 +57,4 @@ export const LINK_ICONS: Record<string, string> = {
   maps:      '📍',
   other:     '🔗',
 }
+

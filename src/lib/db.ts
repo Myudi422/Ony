@@ -147,25 +147,24 @@ export async function logTap(cardId: string, _method?: AccessMethod, _ip?: strin
   })
 }
 
-export async function getUserAnalytics(userId: string, days = 30) {
+export async function getUserAnalytics(userId: string, _days = 30) {
   const cards = await getUserCards(userId)
   if (!cards.length) return { taps: [], clicks: [], total: 0, totalClicks: 0 }
 
   const totalTaps = cards.reduce((sum, c) => sum + (c.total_taps || 0), 0)
-
-  const since = new Date(Date.now() - days * 86400000).toISOString()
   const cardIds = cards.map(c => c.id)
 
-  const { data: clicks } = await supabaseAdmin
-    .from('link_click_logs')
-    .select('clicked_at, link_id')
+  const { data: links } = await supabaseAdmin
+    .from('links')
+    .select('clicks')
     .in('card_id', cardIds)
-    .gte('clicked_at', since)
+
+  const totalClicks = (links ?? []).reduce((acc: number, l: { clicks?: number }) => acc + (l.clicks || 0), 0)
 
   return {
     taps: [],
-    clicks: clicks ?? [],
+    clicks: [],
     total: totalTaps,
-    totalClicks: (clicks ?? []).length,
+    totalClicks,
   }
 }

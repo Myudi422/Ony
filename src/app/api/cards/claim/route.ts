@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
   if (!token?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { code, purpose, redirectUrl } = await req.json()
+  const { code, purpose, redirectUrl, cardName } = await req.json()
   if (!code) return NextResponse.json({ error: 'Activation code required' }, { status: 400 })
 
   const cleanCode = String(code).trim().toUpperCase()
@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
   let mode = card.mode || 'profile'
   let finalRedirectUrl = card.redirect_url
 
-  if (purpose === 'google_review') {
+  if (purpose === 'smart_review') {
+    mode = 'smart_review'
+    finalRedirectUrl = redirectUrl ? String(redirectUrl).trim() : null
+  } else if (purpose === 'google_review') {
     mode = 'google_review'
     finalRedirectUrl = redirectUrl ? String(redirectUrl).trim() : null
   } else if (purpose === 'custom_redirect') {
@@ -53,12 +56,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Bind card to user
+  const finalCardName = cardName && String(cardName).trim() ? String(cardName).trim() : `${token.name ?? 'Saya'}'s Card`
+
   const { data: updated, error: updateErr } = await supabaseAdmin
     .from('cards')
     .update({
       user_id: token.userId as string,
       status: 'active',
-      card_name: `${token.name ?? 'Saya'}'s Card`,
+      card_name: finalCardName,
       mode: mode,
       redirect_url: finalRedirectUrl,
       updated_at: new Date().toISOString(),

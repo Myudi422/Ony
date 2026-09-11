@@ -4,7 +4,7 @@ import { getLivePricing } from '@/lib/pricing'
 import type { Metadata } from 'next'
 import ClaimPage from './ClaimPage'
 import ProfilePage from './ProfilePage'
-import { headers } from 'next/headers'
+import ReviewFilterPage from './ReviewFilterPage'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +17,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params
   const { data: card } = await supabaseAdmin
     .from('cards')
-    .select('card_name, user_id')
+    .select('card_name, user_id, mode, status')
     .eq('activation_code', code.trim().toUpperCase())
     .maybeSingle()
+
+  if (card?.status === 'active' && card?.mode === 'smart_review') {
+    return {
+      title: { absolute: 'Review Feedback | Ony' },
+      description: 'Formulir ulasan dan masukan pelanggan',
+    }
+  }
 
   let name = 'Profil Digital'
   if (card?.user_id) {
@@ -61,26 +68,13 @@ export default async function CardPage({ params, searchParams }: Props) {
 
   if (!card) return notFound()
 
-  // Non-blocking telemetry (Fire-and-Forget)
-  // Extracts headers without delaying the HTTP redirect response
-  const headersList = await headers()
-  const ua = headersList.get('user-agent') ?? 'Browser'
-  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
-  const accessMethod = method === 'qr' ? 'qr_scan' : 'nfc_tap'
-
   // Fire-and-forget telemetry (runs in background, zero delay for user)
+  // Atomic counter increment per-card without creating tap_logs rows to conserve DB storage
   void (async () => {
     try {
-      const { error: rpcErr } = await supabaseAdmin.rpc('log_card_tap', {
-        p_card_id: card.id,
-        p_access_method: accessMethod,
-        p_ip: ip,
-        p_ua: ua,
-        p_user_id: card.user_id || null,
-      })
-
+      const { error: rpcErr } = await supabaseAdmin.rpc('increment_taps', { card_id: card.id })
       if (rpcErr) {
-        // Direct counter increment fallback without tap_logs table insert
+        // Direct counter increment fallback
         const currentTaps = typeof card.total_taps === 'number' ? card.total_taps : 0
         await supabaseAdmin.from('cards').update({ total_taps: currentTaps + 1 }).eq('id', card.id)
       }
@@ -231,6 +225,24 @@ export default async function CardPage({ params, searchParams }: Props) {
   // Trigger redirect outside try/catch block if auto-check settled
   if (targetRedirectUrl) {
     redirect(targetRedirectUrl)
+  }
+
+  // Smart Review Filter (Rating Gatekeeper: 5-Star -> Google Maps, 1-4 Star -> WhatsApp)
+  // ONLY triggered if card mode is specifically 'smart_review' and card is active!
+  if (card.status === 'active' && card.mode === 'smart_review' && card.redirect_url && card.redirect_url !== 'UNPAID' && card.redirect_url.startsWith('http')) {
+    const rawUrl = card.redirect_url
+    const hashIndex = rawUrl.indexOf('#wa=')
+    const googleReviewUrl = hashIndex !== -1 ? rawUrl.substring(0, hashIndex) : rawUrl
+    const waNumber = (card as any).complaint_wa || (hashIndex !== -1 ? rawUrl.substring(hashIndex + 4) : '')
+
+    return (
+      <ReviewFilterPage
+        code={cleanCode}
+        businessName={card.card_name || 'Bisnis Kami'}
+        googleReviewUrl={googleReviewUrl}
+        complaintWa={waNumber}
+      />
+    )
   }
 
   // Active Direct / Google Review / Custom Redirect — INSTANT REDIRECT if valid URL exists

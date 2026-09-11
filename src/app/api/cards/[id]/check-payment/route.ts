@@ -155,7 +155,7 @@ export async function POST(
           }
 
           const finalRedirectUrl = targetUrl && targetUrl.startsWith('http') ? targetUrl : null
-          const cardName = purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card')
+          const cardName = metadata?.cardName || (purpose === 'google_review' ? 'Google Review' : (purpose === 'custom_redirect' ? 'Custom Redirect' : 'Business Card'))
 
           const updateObj: Record<string, unknown> = {
             status: 'active',
