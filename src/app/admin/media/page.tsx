@@ -1,21 +1,29 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Plus, Download, RefreshCw, Unlink, QrCode, Copy, Check,
   ExternalLink, Eye, X, Trash2, Search, Filter, Calendar, RotateCcw,
-  CreditCard, Tag, ShieldAlert, Palette, FileText, CheckCircle2, Loader2
+  CreditCard, Tag, ShieldAlert, Palette, FileText, CheckCircle2, Loader2,
+  Save, Move, Maximize2
 } from 'lucide-react'
 import { formatDate, MEDIA_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import {
+  MOCKUP_PRESETS,
+  getMockupPreset,
+  generateMockupForPreset,
   downloadSingleCardMockup,
   downloadCardMockupsZIP,
   downloadCardMockupPDF,
   generateCardMockupCanvas,
   generateCardBackCanvas,
+  MockupConfig,
+  getEffectivePresetConfig,
+  saveSavedPresetLayout,
+  clearSavedPresetLayout,
 } from '@/lib/mockup-generator'
 
 interface Card {
@@ -83,41 +91,152 @@ export default function AdminMediaPage() {
 
   // Mockup Card Generator Modal State
   const [mockupModalCard, setMockupModalCard] = useState<Card | null>(null)
-  const [mockupCanvasUrl, setMockupCanvasUrl] = useState<string | null>(null)
-  const [mockupBackCanvasUrl, setMockupBackCanvasUrl] = useState<string | null>(null)
-  const [mockupSide, setMockupSide] = useState<'front' | 'back'>('front')
+  const [mockupPresetId, setMockupPresetId] = useState<string>('ktp-2side')
+  const [selectedBatchPresetId, setSelectedBatchPresetId] = useState<string>('ktp-2side')
+  const [mockupSideId, setMockupSideId] = useState<string>('front')
+  const [mockupCanvasMap, setMockupCanvasMap] = useState<Record<string, string>>({})
   const [mockupLoading, setMockupLoading] = useState(false)
   const [zipProgress, setZipProgress] = useState<{ completed: number; total: number } | null>(null)
   const [pdfProgress, setPdfProgress] = useState<{ completed: number; total: number } | null>(null)
 
-  // Custom Mockup adjustments (Defaults: X=174, Y=444, Size=280)
+  // Custom Mockup adjustments
   const [mockupQrX, setMockupQrX] = useState(174)
   const [mockupQrY, setMockupQrY] = useState(444)
   const [mockupQrSize, setMockupQrSize] = useState(280)
 
+  // Interactive Drag & Resize Overlay State
+  const [imgScale, setImgScale] = useState<number | null>(null)
+  const previewImgRef = useRef<HTMLImageElement | null>(null)
+  const [isDraggingOverlay, setIsDraggingOverlay] = useState(false)
+  const [isResizingOverlay, setIsResizingOverlay] = useState(false)
+  const dragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number; startSize: number } | null>(null)
+
+  const activePreset = getMockupPreset(mockupPresetId)
+
+  const updateImgDimensions = useCallback(() => {
+    if (!previewImgRef.current) return
+    const { width, naturalWidth } = previewImgRef.current
+    if (naturalWidth > 0 && width > 0) {
+      setImgScale(width / naturalWidth)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('resize', updateImgDimensions)
+    return () => window.removeEventListener('resize', updateImgDimensions)
+  }, [updateImgDimensions])
+
+  const handleOverlayPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsDraggingOverlay(true)
+    dragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX: mockupQrX,
+      startY: mockupQrY,
+      startSize: mockupQrSize,
+    }
+  }
+
+  const handleResizeHandlePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsResizingOverlay(true)
+    dragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX: mockupQrX,
+      startY: mockupQrY,
+      startSize: mockupQrSize,
+    }
+  }
+
+  useEffect(() => {
+    if (!isDraggingOverlay && !isResizingOverlay) return
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!dragStartRef.current || !imgScale || imgScale <= 0) return
+      const deltaX = (e.clientX - dragStartRef.current.clientX) / imgScale
+      const deltaY = (e.clientY - dragStartRef.current.clientY) / imgScale
+
+      if (isDraggingOverlay) {
+        const newX = Math.round(Math.max(activePreset.minQrX, Math.min(activePreset.maxQrX, dragStartRef.current.startX + deltaX)))
+        const newY = Math.round(Math.max(activePreset.minQrY, Math.min(activePreset.maxQrY, dragStartRef.current.startY + deltaY)))
+        setMockupQrX(newX)
+        setMockupQrY(newY)
+      } else if (isResizingOverlay) {
+        const deltaSize = Math.max(deltaX, deltaY)
+        const newSize = Math.round(Math.max(activePreset.minQrSize, Math.min(activePreset.maxQrSize, dragStartRef.current.startSize + deltaSize)))
+        setMockupQrSize(newSize)
+      }
+    }
+
+    const handlePointerUp = () => {
+      setIsDraggingOverlay(false)
+      setIsResizingOverlay(false)
+      dragStartRef.current = null
+      handleUpdateMockupCanvas()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [isDraggingOverlay, isResizingOverlay, imgScale, activePreset, mockupQrX, mockupQrY, mockupQrSize])
+
+  const renderPresetCanvases = async (card: Card, presetId: string, customConfig?: Partial<MockupConfig>) => {
+    const preset = getMockupPreset(presetId)
+    const map: Record<string, string> = {}
+    const configToUse = {
+      qrX: customConfig?.qrX ?? mockupQrX,
+      qrY: customConfig?.qrY ?? mockupQrY,
+      qrSize: customConfig?.qrSize ?? mockupQrSize,
+    }
+    for (const side of preset.sides) {
+      const canvas = await generateMockupForPreset(card.activation_code, preset.id, side.id, configToUse)
+      map[side.id] = canvas.toDataURL('image/png')
+    }
+    return map
+  }
+
   const handleOpenMockupModal = async (card: Card) => {
     setMockupModalCard(card)
-    setMockupSide('front')
+    const preset = getMockupPreset(mockupPresetId)
+    const effective = getEffectivePresetConfig(mockupPresetId)
+    setMockupSideId(preset.sides[0].id)
+    setMockupQrX(effective.qrX)
+    setMockupQrY(effective.qrY)
+    setMockupQrSize(effective.qrSize)
     setMockupLoading(true)
-    setMockupCanvasUrl(null)
-    setMockupBackCanvasUrl(null)
+    setMockupCanvasMap({})
     try {
-      const [frontCanvas, backCanvas] = await Promise.all([
-        generateCardMockupCanvas(card.activation_code, {
-          qrX: mockupQrX,
-          qrY: mockupQrY,
-          qrSize: mockupQrSize,
-        }),
-        generateCardBackCanvas(card.activation_code, {
-          qrX: mockupQrX,
-          qrY: mockupQrY,
-          qrSize: mockupQrSize,
-        }),
-      ])
-      setMockupCanvasUrl(frontCanvas.toDataURL('image/png'))
-      setMockupBackCanvasUrl(backCanvas.toDataURL('image/png'))
+      const map = await renderPresetCanvases(card, preset.id, effective)
+      setMockupCanvasMap(map)
     } catch (_) {
       showToast('Gagal memuat canvas mockup.')
+    }
+    setMockupLoading(false)
+  }
+
+  const handlePresetChange = async (newPresetId: string) => {
+    setMockupPresetId(newPresetId)
+    const preset = getMockupPreset(newPresetId)
+    const effective = getEffectivePresetConfig(newPresetId)
+    setMockupSideId(preset.sides[0].id)
+    setMockupQrX(effective.qrX)
+    setMockupQrY(effective.qrY)
+    setMockupQrSize(effective.qrSize)
+
+    if (!mockupModalCard) return
+    setMockupLoading(true)
+    try {
+      const map = await renderPresetCanvases(mockupModalCard, preset.id, effective)
+      setMockupCanvasMap(map)
+    } catch (_) {
+      showToast('Gagal mengubah preset mockup.')
     }
     setMockupLoading(false)
   }
@@ -126,50 +245,81 @@ export default function AdminMediaPage() {
     if (!mockupModalCard) return
     setMockupLoading(true)
     try {
-      const [frontCanvas, backCanvas] = await Promise.all([
-        generateCardMockupCanvas(mockupModalCard.activation_code, {
-          qrX: mockupQrX,
-          qrY: mockupQrY,
-          qrSize: mockupQrSize,
-        }),
-        generateCardBackCanvas(mockupModalCard.activation_code, {
-          qrX: mockupQrX,
-          qrY: mockupQrY,
-          qrSize: mockupQrSize,
-        }),
-      ])
-      setMockupCanvasUrl(frontCanvas.toDataURL('image/png'))
-      setMockupBackCanvasUrl(backCanvas.toDataURL('image/png'))
+      const map = await renderPresetCanvases(mockupModalCard, mockupPresetId, {
+        qrX: mockupQrX,
+        qrY: mockupQrY,
+        qrSize: mockupQrSize,
+      })
+      setMockupCanvasMap(map)
     } catch (_) { }
     setMockupLoading(false)
   }
 
-  const handleDownloadBatchZip = async (targetCards: Card[] = selectedCards) => {
+  const handleSaveLayoutDefault = () => {
+    saveSavedPresetLayout(mockupPresetId, {
+      qrX: mockupQrX,
+      qrY: mockupQrY,
+      qrSize: mockupQrSize,
+    })
+    showToast(`💾 Layout default untuk ${activePreset.name} berhasil disimpan!`)
+  }
+
+  const handleResetLayoutPabrik = async () => {
+    clearSavedPresetLayout(mockupPresetId)
+    const preset = getMockupPreset(mockupPresetId)
+    setMockupQrX(preset.defaultQrX)
+    setMockupQrY(preset.defaultQrY)
+    setMockupQrSize(preset.defaultQrSize)
+    showToast(`🔄 Layout preset ${preset.name} di-reset ke default pabrik.`)
+    if (!mockupModalCard) return
+    setMockupLoading(true)
+    try {
+      const map = await renderPresetCanvases(mockupModalCard, preset.id, {
+        qrX: preset.defaultQrX,
+        qrY: preset.defaultQrY,
+        qrSize: preset.defaultQrSize,
+      })
+      setMockupCanvasMap(map)
+    } catch (_) { }
+    setMockupLoading(false)
+  }
+
+  const handleDownloadBatchZip = async (targetCards: Card[] = selectedCards, presetId: string = selectedBatchPresetId) => {
     if (targetCards.length === 0) return
     setZipProgress({ completed: 0, total: targetCards.length })
     try {
+      const configToUse = (mockupModalCard && presetId === mockupPresetId)
+        ? { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize }
+        : getEffectivePresetConfig(presetId)
+
       await downloadCardMockupsZIP(
         targetCards,
-        { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize },
-        (completed, total) => setZipProgress({ completed, total })
+        configToUse,
+        (completed, total) => setZipProgress({ completed, total }),
+        presetId
       )
-      showToast(`✨ Berhasil men-download ZIP batch ${targetCards.length} kartu (Depan + Belakang + PDF)!`)
+      showToast(`✨ Berhasil men-download ZIP batch ${targetCards.length} item!`)
     } catch (err: any) {
       alert(`Gagal download batch ZIP: ${err?.message || 'Error'}`)
     }
     setZipProgress(null)
   }
 
-  const handleDownloadBatchPdf = async (targetCards: Card[] = selectedCards) => {
+  const handleDownloadBatchPdf = async (targetCards: Card[] = selectedCards, presetId: string = selectedBatchPresetId) => {
     if (targetCards.length === 0) return
     setPdfProgress({ completed: 0, total: targetCards.length })
     try {
+      const configToUse = (mockupModalCard && presetId === mockupPresetId)
+        ? { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize }
+        : getEffectivePresetConfig(presetId)
+
       await downloadCardMockupPDF(
         targetCards,
-        { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize },
-        (completed, total) => setPdfProgress({ completed, total })
+        configToUse,
+        (completed, total) => setPdfProgress({ completed, total }),
+        presetId
       )
-      showToast(`📄 Berhasil men-download PDF cetak Duplex ${targetCards.length} kartu!`)
+      showToast(`📄 Berhasil men-download PDF cetak ${targetCards.length} item!`)
     } catch (err: any) {
       alert(`Gagal download PDF: ${err?.message || 'Error'}`)
     }
@@ -635,24 +785,44 @@ export default function AdminMediaPage() {
 
             {/* Bulk Actions for Batch Generation */}
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-white/90 border border-blue-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                <Palette size={13} className="text-blue-600 shrink-0" />
+                <span className="text-[11px] text-slate-700 font-semibold whitespace-nowrap">Mockup:</span>
+                <select
+                  value={selectedBatchPresetId}
+                  onChange={(e) => setSelectedBatchPresetId(e.target.value)}
+                  className="bg-transparent text-slate-900 text-xs font-bold focus:outline-none cursor-pointer"
+                >
+                  {MOCKUP_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
-                onClick={() => handleDownloadBatchPdf(newCards)}
+                onClick={() => handleDownloadBatchPdf(newCards, selectedBatchPresetId)}
                 disabled={!!pdfProgress}
                 className="text-xs text-blue-950 bg-gradient-to-r from-blue-300 via-sky-400 to-blue-500 hover:from-blue-400 hover:to-blue-600 px-3.5 py-1.5 rounded-xl transition-all shadow-md font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Download PDF cetak 2 sisi (duplex: Depan + Belakang)"
+                title={`Download PDF cetak ${getMockupPreset(selectedBatchPresetId).name}`}
               >
                 {pdfProgress ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                <span>{pdfProgress ? `Generate PDF (${pdfProgress.completed}/${pdfProgress.total})...` : `Download PDF Duplex (${newCards.length})`}</span>
+                <span>
+                  {pdfProgress
+                    ? `Generate PDF (${pdfProgress.completed}/${pdfProgress.total})...`
+                    : `Download PDF ${getMockupPreset(selectedBatchPresetId).name.replace('Mockup ', '')} (${newCards.length})`}
+                </span>
               </button>
 
               <button
-                onClick={() => handleDownloadBatchZip(newCards)}
+                onClick={() => handleDownloadBatchZip(newCards, selectedBatchPresetId)}
                 disabled={!!zipProgress}
                 className="text-xs text-amber-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 px-3.5 py-1.5 rounded-xl transition-all shadow-md font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Download semua mockup cetak (Depan + Belakang + PDF) dalam file ZIP"
+                title={`Download semua mockup cetak (${getMockupPreset(selectedBatchPresetId).name}) dalam file ZIP`}
               >
                 {zipProgress ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                <span>{zipProgress ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...` : `Download Package ZIP (${newCards.length})`}</span>
+                <span>{zipProgress ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...` : `Download ZIP Paket (${newCards.length})`}</span>
               </button>
 
               <button
@@ -954,23 +1124,48 @@ export default function AdminMediaPage() {
             >
               <Tag size={13} /> Salin {selectedIds.length} Kode
             </button>
+            {/* Batch Mockup Preset Selector */}
+            <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-xl shadow-xs">
+              <Palette size={13} className="text-amber-400 shrink-0" />
+              <span className="text-[11px] text-slate-300 font-semibold whitespace-nowrap">Template:</span>
+              <select
+                value={selectedBatchPresetId}
+                onChange={(e) => setSelectedBatchPresetId(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-amber-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+              >
+                {MOCKUP_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <button
-              onClick={() => handleDownloadBatchPdf()}
+              onClick={() => handleDownloadBatchPdf(selectedCards, selectedBatchPresetId)}
               disabled={!!pdfProgress}
               className="flex items-center gap-1.5 text-xs text-blue-950 bg-gradient-to-r from-blue-300 via-sky-400 to-blue-500 hover:from-blue-400 hover:to-blue-600 px-3.5 py-2 rounded-xl transition-all shadow-md font-extrabold cursor-pointer disabled:opacity-50"
-              title="Download PDF cetak 2 sisi (Putih 1, Hitam 1, Putih 2, Hitam 2...)"
+              title={`Download PDF cetak ${getMockupPreset(selectedBatchPresetId).name}`}
             >
               {pdfProgress ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-              <span>{pdfProgress ? `Generat PDF (${pdfProgress.completed}/${pdfProgress.total})...` : `Download PDF Duplex (${selectedIds.length})`}</span>
+              <span>
+                {pdfProgress
+                  ? `Generate PDF (${pdfProgress.completed}/${pdfProgress.total})...`
+                  : `Download PDF ${getMockupPreset(selectedBatchPresetId).name.replace('Mockup ', '')} (${selectedIds.length})`}
+              </span>
             </button>
             <button
-              onClick={() => handleDownloadBatchZip()}
+              onClick={() => handleDownloadBatchZip(selectedCards, selectedBatchPresetId)}
               disabled={!!zipProgress}
               className="flex items-center gap-1.5 text-xs text-amber-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 px-3.5 py-2 rounded-xl transition-all shadow-md font-extrabold cursor-pointer disabled:opacity-50"
-              title="Download semua mockup kartu cetak (Depan + Belakang + PDF) dalam file ZIP"
+              title={`Download semua mockup cetak ${getMockupPreset(selectedBatchPresetId).name} dalam file ZIP`}
             >
               {zipProgress ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-              <span>{zipProgress ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...` : `Download Package ZIP (${selectedIds.length})`}</span>
+              <span>
+                {zipProgress
+                  ? `Proses ZIP (${zipProgress.completed}/${zipProgress.total})...`
+                  : `Download ZIP Paket (${selectedIds.length})`}
+              </span>
             </button>
             <button
               onClick={() => bulkCopyCSV()}
@@ -1521,7 +1716,7 @@ export default function AdminMediaPage() {
         )}
       </Dialog>
 
-      {/* MOCKUP CARD PRINT PREVIEW MODAL (3.4" x 2.1") */}
+      {/* MOCKUP PRINT PREVIEW MODAL */}
       <Dialog open={!!mockupModalCard} onOpenChange={(open) => !open && setMockupModalCard(null)}>
         {mockupModalCard && (
           <DialogContent className="w-[95vw] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 bg-white rounded-3xl border border-slate-200 shadow-2xl">
@@ -1531,136 +1726,210 @@ export default function AdminMediaPage() {
                 <span className="truncate">Mockup Cetak ({mockupModalCard.activation_code})</span>
               </DialogTitle>
               <DialogDescription className="text-slate-500 text-[11px] sm:text-xs">
-                Ukuran cetak standar <strong>3,4 inc x 2,1 inc</strong> (CR80 vertical, 300 DPI).
+                Format: <strong>{activePreset.name}</strong> ({activePreset.description})
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3.5 pt-1 text-center">
-              {/* Tab Selector: Depan vs Belakang */}
-              <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setMockupSide('front')}
-                  className={cn(
-                    'flex-1 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
-                    mockupSide === 'front'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                  )}
+              {/* Preset Selector */}
+              <div className="text-left space-y-1.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <label className="text-[11px] font-bold text-slate-700 block font-display flex items-center gap-1.5">
+                  <Palette size={14} className="text-amber-500 shrink-0" />
+                  <span>Pilih Desain & Layout Mockup:</span>
+                </label>
+                <select
+                  value={mockupPresetId}
+                  onChange={(e) => handlePresetChange(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-2 focus:ring-amber-400 focus:outline-none cursor-pointer"
                 >
-                  <span className="w-2 h-2 rounded-full bg-slate-800 shrink-0" />
-                  <span>Depan (Putih)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMockupSide('back')}
-                  className={cn(
-                    'flex-1 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
-                    mockupSide === 'back'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                  )}
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span>Belakang (Hitam)</span>
-                </button>
+                  {MOCKUP_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {p.description}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Card Canvas Image Preview */}
-              <div className="relative bg-slate-900/5 p-2 sm:p-4 rounded-2xl border border-slate-200 flex items-center justify-center min-h-[200px] sm:min-h-[280px] overflow-hidden">
+              {/* Side Selector Tabs (if multi-side preset) */}
+              {activePreset.sides.length > 1 && (
+                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                  {activePreset.sides.map((side) => (
+                    <button
+                      key={side.id}
+                      type="button"
+                      onClick={() => setMockupSideId(side.id)}
+                      className={cn(
+                        'flex-1 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                        mockupSideId === side.id
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      <span className={cn('w-2 h-2 rounded-full shrink-0', side.id === 'front' ? 'bg-slate-800' : 'bg-amber-400')} />
+                      <span>{side.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Card Canvas Image Preview with Drag & Resize Overlay */}
+              <div className="relative bg-slate-900/5 p-2 sm:p-4 rounded-2xl border border-slate-200 flex items-center justify-center min-h-[200px] sm:min-h-[280px] overflow-hidden select-none">
                 {mockupLoading ? (
                   <div className="flex flex-col items-center gap-2 text-slate-500 text-xs font-semibold py-8">
                     <Loader2 size={24} className="animate-spin text-amber-500" />
                     <span>Rendering mockup...</span>
                   </div>
-                ) : (mockupSide === 'front' ? mockupCanvasUrl : mockupBackCanvasUrl) ? (
-                  <img
-                    src={mockupSide === 'front' ? mockupCanvasUrl! : mockupBackCanvasUrl!}
-                    alt={`Mockup Kartu ${mockupSide} ${mockupModalCard.activation_code}`}
-                    className="max-h-[35vh] sm:max-h-[320px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-300 transition-transform hover:scale-[1.01]"
-                  />
+                ) : mockupCanvasMap[mockupSideId] ? (
+                  <div className="relative inline-block max-w-full">
+                    <img
+                      ref={previewImgRef}
+                      src={mockupCanvasMap[mockupSideId]}
+                      alt={`Mockup ${mockupSideId} ${mockupModalCard.activation_code}`}
+                      onLoad={updateImgDimensions}
+                      className="max-h-[35vh] sm:max-h-[320px] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-300 pointer-events-none block"
+                    />
+
+                    {/* Interactive QR Box Overlay */}
+                    {imgScale && imgScale > 0 && (
+                      <div
+                        onPointerDown={handleOverlayPointerDown}
+                        style={{
+                          left: `${mockupQrX * imgScale}px`,
+                          top: `${mockupQrY * imgScale}px`,
+                          width: `${mockupQrSize * imgScale}px`,
+                          height: `${mockupQrSize * imgScale}px`,
+                        }}
+                        className={cn(
+                          'absolute border-2 rounded-xl transition-colors cursor-move flex items-center justify-center group touch-none',
+                          isDraggingOverlay || isResizingOverlay
+                            ? 'border-amber-500 bg-amber-500/20 shadow-lg ring-2 ring-amber-400/50'
+                            : 'border-amber-400/80 bg-amber-400/10 hover:border-amber-500 hover:bg-amber-400/20'
+                        )}
+                      >
+                        {/* Drag Badge */}
+                        <div className="bg-slate-900/90 text-amber-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow-xs flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <Move size={10} />
+                          <span>Geser QR</span>
+                        </div>
+
+                        {/* Bottom-Right Corner Resize Handle */}
+                        <div
+                          onPointerDown={handleResizeHandlePointerDown}
+                          className="absolute -bottom-2 -right-2 w-6 h-6 bg-amber-500 text-slate-900 rounded-full border-2 border-white flex items-center justify-center cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                          title="Tarik untuk mengubah ukuran QR"
+                        >
+                          <Maximize2 size={10} className="rotate-45" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <span className="text-xs text-slate-400">Gagal memuat preview.</span>
                 )}
               </div>
 
-              {/* Adjustments (Offset & Size) - only active on Front Side */}
-              {mockupSide === 'front' && (
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-left animate-fade-in">
-                  <span className="text-[11px] font-bold text-slate-700 block font-display">⚡ Penyesuaian Posisi QR Sisi Depan:</span>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Posisi X ({mockupQrX}px)</label>
-                      <input
-                        type="range"
-                        min={100}
-                        max={200}
-                        value={mockupQrX}
-                        onChange={e => setMockupQrX(Number(e.target.value))}
-                        onMouseUp={handleUpdateMockupCanvas}
-                        onTouchEnd={handleUpdateMockupCanvas}
-                        className="w-full cursor-pointer accent-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Posisi Y ({mockupQrY}px)</label>
-                      <input
-                        type="range"
-                        min={350}
-                        max={460}
-                        value={mockupQrY}
-                        onChange={e => setMockupQrY(Number(e.target.value))}
-                        onMouseUp={handleUpdateMockupCanvas}
-                        onTouchEnd={handleUpdateMockupCanvas}
-                        className="w-full cursor-pointer accent-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Ukuran ({mockupQrSize}px)</label>
-                      <input
-                        type="range"
-                        min={220}
-                        max={340}
-                        value={mockupQrSize}
-                        onChange={e => setMockupQrSize(Number(e.target.value))}
-                        onMouseUp={handleUpdateMockupCanvas}
-                        onTouchEnd={handleUpdateMockupCanvas}
-                        className="w-full cursor-pointer accent-amber-500"
-                      />
-                    </div>
+              {/* Adjustments Panel (Sliders + Save Default / Reset Buttons) */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700 font-display">⚡ Penyesuaian Posisi QR ({activePreset.name}):</span>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 font-mono">
+                    X:{mockupQrX} Y:{mockupQrY} S:{mockupQrSize}px
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] text-slate-500 block">Posisi X ({mockupQrX}px)</label>
+                    <input
+                      type="range"
+                      min={activePreset.minQrX}
+                      max={activePreset.maxQrX}
+                      value={mockupQrX}
+                      onChange={e => setMockupQrX(Number(e.target.value))}
+                      onMouseUp={handleUpdateMockupCanvas}
+                      onTouchEnd={handleUpdateMockupCanvas}
+                      className="w-full cursor-pointer accent-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block">Posisi Y ({mockupQrY}px)</label>
+                    <input
+                      type="range"
+                      min={activePreset.minQrY}
+                      max={activePreset.maxQrY}
+                      value={mockupQrY}
+                      onChange={e => setMockupQrY(Number(e.target.value))}
+                      onMouseUp={handleUpdateMockupCanvas}
+                      onTouchEnd={handleUpdateMockupCanvas}
+                      className="w-full cursor-pointer accent-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block">Ukuran ({mockupQrSize}px)</label>
+                    <input
+                      type="range"
+                      min={activePreset.minQrSize}
+                      max={activePreset.maxQrSize}
+                      value={mockupQrSize}
+                      onChange={e => setMockupQrSize(Number(e.target.value))}
+                      onMouseUp={handleUpdateMockupCanvas}
+                      onTouchEnd={handleUpdateMockupCanvas}
+                      className="w-full cursor-pointer accent-amber-500"
+                    />
                   </div>
                 </div>
-              )}
 
-              {/* Action Buttons: PDF Duplex & Package Downloads */}
+                {/* Save Default & Reset Action Buttons */}
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={handleSaveLayoutDefault}
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-extrabold shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer font-display"
+                  >
+                    <Save size={13} />
+                    <span>Simpan Layout Default</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetLayoutPabrik}
+                    className="py-2 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 font-display"
+                    title="Reset ke default pabrik preset ini"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
               <div className="space-y-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => handleDownloadBatchPdf([mockupModalCard])}
+                  onClick={() => handleDownloadBatchPdf([mockupModalCard], mockupPresetId)}
                   disabled={!!pdfProgress}
                   className="w-full py-2.5 sm:py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 transition-all font-display cursor-pointer disabled:opacity-50"
                 >
                   <FileText size={15} />
-                  <span>Download PDF Cetak (Depan + Belakang)</span>
+                  <span>Download PDF Cetak ({activePreset.name})</span>
                 </button>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                   <button
                     type="button"
-                    onClick={() => handleDownloadBatchZip([mockupModalCard])}
+                    onClick={() => handleDownloadBatchZip([mockupModalCard], mockupPresetId)}
                     disabled={!!zipProgress}
                     className="py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all font-display cursor-pointer disabled:opacity-50"
                   >
                     <Download size={13} />
-                    <span>Download ZIP (Depan & Belakang)</span>
+                    <span>Download ZIP Paket</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => downloadSingleCardMockup(mockupModalCard.activation_code, { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize })}
+                    onClick={() => downloadSingleCardMockup(mockupModalCard.activation_code, { qrX: mockupQrX, qrY: mockupQrY, qrSize: mockupQrSize }, mockupPresetId, mockupSideId)}
                     className="py-2.5 px-3 rounded-2xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-all font-display cursor-pointer"
                   >
                     <Download size={13} />
-                    <span>PNG Depan Saja</span>
+                    <span>PNG Display Saja</span>
                   </button>
                 </div>
 
